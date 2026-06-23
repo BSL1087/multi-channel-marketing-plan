@@ -144,7 +144,86 @@ App-Fundament
 **Hinweis zu Tests:** PROJ-1 enthält keine API-Routen (Login-UI/-Flows folgen in PROJ-2), daher keine Route-Integrationstests. Verifikation erfolgt im `/qa`-Schritt gegen die Akzeptanzkriterien.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-06-23
+**Tester:** QA Engineer (AI)
+**Scope:** Infrastruktur-Feature ohne UI — geprüft wurden Konfiguration, App-Integrität (Build) und Sicherheitsverhalten live gegen die Supabase-API (Projekt `grtqmrnjjsucskdeghrr`). UI-/Session-abhängige Kriterien sind zu PROJ-2 (Login-Oberfläche) verschoben.
+
+### Acceptance Criteria Status
+
+#### AC-1: Verbindung über Umgebungsvariablen
+- [x] `npm run build` lädt `.env.local` und kompiliert erfolgreich; Middleware verbindet sich mit Supabase
+
+#### AC-2: Login erzeugt gültige Sitzung
+- [~] Admin-Account `benedikt@agonsworld.com` existiert und ist bestätigt (login-fähig). Vollständiger Login-Flow benötigt UI → Test in PROJ-2
+
+#### AC-3: Öffentliche Registrierung deaktiviert
+- [x] POST `/auth/v1/signup` → HTTP 422, kein Nutzer angelegt (nach Fix, siehe BUG-1)
+
+#### AC-4: Admin-Account + Profil mit Anzeigename
+- [x] Account angelegt, Profil per Trigger automatisch erstellt, Anzeigename „Benedikt" gesetzt und abrufbar
+
+#### AC-5: Nicht eingeloggt → kein Datenzugriff (RLS)
+- [x] anon SELECT auf `profiles` → leeres Ergebnis (trotz vorhandenem Profil)
+- [x] anon INSERT auf `profiles` → HTTP 401, „new row violates row-level security policy"
+
+#### AC-6: Eingeloggt → Vollzugriff auf gemeinsamen Arbeitsbereich
+- [~] RLS-Policies für `authenticated` sind definiert; Laufzeit-Test mit echter Session → PROJ-2
+
+#### AC-7: Audit-Spalten werden automatisch gesetzt
+- [n/a] Noch keine Arbeitsbereich-Tabellen vorhanden (Audit-Spalten sind Konvention für PROJ-3/4/5) → dort zu testen
+
+#### AC-8: Account gelöscht → Profil entfernt (Cascade)
+- [x] FK-Löschverhalten = CASCADE bestätigt; Test-Nutzer gelöscht → zugehöriges Profil ebenfalls entfernt, 0 Waisen-Profile
+
+### Edge Cases Status
+
+#### EC-1: Account ohne Profil → Fallback auf E-Mail
+- [x] Bei Account-Anlage ohne Metadaten setzte der Trigger die E-Mail als Anzeigenamen (vor manueller Änderung auf „Benedikt")
+
+#### EC-2: Direkter API-Zugriff ohne Token → RLS verweigert
+- [x] Bestätigt über anon SELECT/INSERT (AC-5)
+
+#### EC-3: Falsche Anmeldedaten / Abgelaufene Sitzung
+- [~] Login-UI-Verhalten → Test in PROJ-2
+
+#### EC-4: Fehlende Umgebungsvariablen → klarer Konfigurationsfehler
+- [ ] Nicht getestet (würde laufende Umgebung beschädigen) — als Hinweis für PROJ-2 vermerkt
+
+### Security Audit Results
+- [x] Authentifizierung: kein Datenzugriff ohne Login (anon default-deny)
+- [x] Autorisierung: anon kann weder lesen noch schreiben
+- [x] Trigger-Funktion `handle_new_user()` gehärtet (EXECUTE entzogen) → Security-Advisors: **0 Befunde**
+- [x] Secrets: nur Publishable Key in `.env.local` (öffentlich unbedenklich); `.env.local` und `.mcp.json` gitignored; keine Service-Keys im Repo
+- [x] Öffentliches Sign-up nach Fix gesperrt (BUG-1)
+
+### Bugs Found
+
+#### BUG-1: Öffentliches Sign-up war aktiv (während QA behoben)
+- **Severity:** Critical
+- **Steps to Reproduce:**
+  1. POST `/auth/v1/signup` mit beliebiger gültiger E-Mail + Passwort
+  2. Erwartet: Ablehnung (kein Account)
+  3. Tatsächlich (vorher): HTTP 200, Account wurde angelegt → jeder hätte sich registrieren können
+- **Status:** ✅ BEHOBEN — Sign-up im Dashboard deaktiviert, Re-Test ergibt HTTP 422 ohne Account. Test-Nutzer wurden bereinigt.
+- **Priority:** Fix before deployment (erledigt)
+
+#### BUG-2: `middleware.ts` nutzt veraltete Next.js-16-Konvention
+- **Severity:** Low
+- **Detail:** Build-Warnung „The 'middleware' file convention is deprecated. Please use 'proxy' instead." Funktioniert aktuell (Route „Proxy (Middleware)" aktiv), sollte aber zu `src/proxy.ts` umbenannt werden.
+- **Priority:** Fix in next sprint
+
+#### BUG-3: `npm run lint` schlägt fehl
+- **Severity:** Low
+- **Detail:** `next lint` wurde in Next.js 16 entfernt; das `lint`-Script im Template ist dadurch defekt. Bestehendes Template-Problem, nicht durch PROJ-1 verursacht. TypeScript-Check (`tsc --noEmit`) und Build laufen fehlerfrei. Empfehlung: ESLint-CLI-Migration.
+- **Priority:** Nice to have
+
+### Summary
+- **Acceptance Criteria:** 5/8 voll bestanden, 2 verschoben auf PROJ-2 (UI/Session nötig), 1 n/a (noch keine Tabellen)
+- **Bugs Found:** 3 total (1 Critical [behoben], 0 High, 0 Medium, 2 Low)
+- **Security:** Pass (nach Behebung von BUG-1; 0 Advisor-Befunde)
+- **Production Ready:** YES (keine offenen Critical/High-Bugs)
+- **Recommendation:** PROJ-1 freigeben. BUG-2/BUG-3 als Low in PROJ-2 mit erledigen. Session-/Login-Kriterien (AC-2, AC-6, EC-1/3) verbindlich in PROJ-2 testen.
 
 ## Deployment
 _To be added by /deploy_

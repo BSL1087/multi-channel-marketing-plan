@@ -15,7 +15,7 @@
 
 | ID | Feature | Status | Prio | Abhängigkeiten | Spec | Created |
 |----|---------|--------|------|----------------|------|---------|
-| PROJ-1 | Supabase-Infrastruktur (DB, Auth, Schema) | In Progress | P0 | Keine | PROJ-1-supabase-infrastruktur.md | 2026-06-23 |
+| PROJ-1 | Supabase-Infrastruktur (DB, Auth, Schema) | Approved | P0 | Keine | PROJ-1-supabase-infrastruktur.md | 2026-06-23 |
 | PROJ-2 | Login / Team-Zugang | Roadmap | P0 | PROJ-1 | — | 2026-06-23 |
 | PROJ-3 | Marketplaces & Webshops verwalten | Roadmap | P0 | PROJ-1, PROJ-2 | — | 2026-06-23 |
 | PROJ-4 | Marken verwalten (mit Farbe) | Roadmap | P0 | PROJ-1, PROJ-2 | — | 2026-06-23 |
