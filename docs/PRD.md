@@ -10,7 +10,7 @@ Marketing-Teams (mehrere gleichberechtigte Nutzer), die parallel auf mehreren Ma
 
 | Priorität | Feature | Status |
 |-----------|---------|--------|
-| P0 (MVP) | Supabase-Infrastruktur (DB, Auth, Schema) | Roadmap |
+| P0 (MVP) | Supabase-Infrastruktur (DB, Auth, Schema) | Planned |
 | P0 (MVP) | Login / Team-Zugang | Roadmap |
 | P0 (MVP) | Marketplaces & Webshops verwalten | Roadmap |
 | P0 (MVP) | Marken verwalten (mit individueller Farbe) | Roadmap |
