@@ -13,9 +13,19 @@
 
 ## Features
 
-| ID | Feature | Status | Spec | Created |
-|----|---------|--------|------|---------|
+| ID | Feature | Status | Prio | Abhängigkeiten | Spec | Created |
+|----|---------|--------|------|----------------|------|---------|
+| PROJ-1 | Supabase-Infrastruktur (DB, Auth, Schema) | Roadmap | P0 | Keine | — | 2026-06-23 |
+| PROJ-2 | Login / Team-Zugang | Roadmap | P0 | PROJ-1 | — | 2026-06-23 |
+| PROJ-3 | Marketplaces & Webshops verwalten | Roadmap | P0 | PROJ-1, PROJ-2 | — | 2026-06-23 |
+| PROJ-4 | Marken verwalten (mit Farbe) | Roadmap | P0 | PROJ-1, PROJ-2 | — | 2026-06-23 |
+| PROJ-5 | Rabatt-Aktionen anlegen & bearbeiten | Roadmap | P0 | PROJ-3, PROJ-4 | — | 2026-06-23 |
+| PROJ-6 | Jahreskalender-Übersicht | Roadmap | P0 | PROJ-5 | — | 2026-06-23 |
+| PROJ-7 | Kannibalisierungs-Warnung | Roadmap | P0 | PROJ-5 | — | 2026-06-23 |
+| PROJ-8 | Monats-Zoom / Tagesansicht | Roadmap | P1 | PROJ-6 | — | 2026-06-23 |
+| PROJ-9 | Aktivitätsprotokoll (wer hat was gemacht) | Roadmap | P1 | PROJ-2 | — | 2026-06-23 |
+| PROJ-10 | Logo-Uploads für Marken & Marketplaces | Roadmap | P1 | PROJ-3, PROJ-4 | — | 2026-06-23 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-1
+## Next Available ID: PROJ-11
