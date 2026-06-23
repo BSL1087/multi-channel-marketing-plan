@@ -139,6 +139,31 @@ Keine neuen. Vorhanden: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookform/re
 - Firmenlogo unter `public/agonsworld-logo-white-background.jpg` (vorhanden)
 - Abgeleitetes Farbschema: dunkles Waldgrün + Salbeigrün als Akzentfarben
 
+## Implementation Notes (Frontend)
+**Stand:** 2026-06-23
+
+**Theme:**
+- `src/app/globals.css`: Primärfarbe auf Waldgrün (`158 38% 27%`), Sekundär/Akzent/Border auf Salbeigrün-Töne umgestellt (aus Logo abgeleitet). Light-Theme.
+- `src/app/layout.tsx`: sonner-`Toaster` eingebunden, Metadaten + `lang="de"`.
+
+**Seiten:**
+- `src/app/login/page.tsx`: öffentliche Login-Seite (Logo + Karte). Server-seitige Weiterleitung zum Dashboard, falls bereits eingeloggt.
+- `src/app/page.tsx`: Dashboard (Server Component) — liest Nutzer + `profiles.display_name`, zeigt Kopfzeile „Eingeloggt als [Anzeigename]", MCM-Kachel, Konto-Bereich. Defense-in-depth-Redirect bei fehlendem Nutzer.
+- `src/app/tools/multi-channel-marketing/page.tsx`: geschützte Platzhalter-Seite („Jahreskalender — kommt in Kürze") mit Zurück-Link.
+
+**Komponenten (Client):**
+- `src/components/login-form.tsx`: react-hook-form + Zod; `signInWithPassword`; generische Fehlermeldung; Button mit Ladezustand; Redirect via `window.location.href`.
+- `src/components/logout-button.tsx`: `signOut` + Redirect zur Login-Seite.
+- `src/components/change-password-dialog.tsx`: Dialog mit neuem Passwort + Bestätigung (Zod: min. 6 Zeichen, Übereinstimmung); `updateUser`; Erfolgs-/Fehler-Toast.
+
+**Route-Schutz (Next.js 16 „proxy"):**
+- `src/proxy.ts` + `src/lib/supabase/proxy.ts`: Session-Refresh + serverseitige Weiterleitungen (nicht eingeloggt → `/login`; eingeloggt + `/login` → `/`).
+- Alte `src/middleware.ts` / `src/lib/supabase/middleware.ts` entfernt → **behebt BUG-2 aus PROJ-1-QA** (keine Deprecation-Warnung mehr im Build).
+
+**Verifikation:** `npm run build` erfolgreich (Exit 0). Alle shadcn-Komponenten waren vorhanden, keine neuen Pakete installiert.
+
+**Kein separater `/backend`-Schritt nötig:** Authentifizierung, Profile und RLS stammen aus PROJ-1; Login/Logout/Passwortänderung laufen direkt über das Supabase-SDK, Route-Schutz über die Proxy. Es gibt keine eigenen API-Routen/Tabellen zu bauen.
+
 ## QA Test Results
 _To be added by /qa_
 
