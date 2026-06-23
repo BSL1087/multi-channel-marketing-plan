@@ -81,12 +81,63 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| Route-Schutz serverseitig in der Middleware/Proxy | Erfüllt Sicherheitsanforderung (nicht nur clientseitig); nutzt PROJ-1-Session-Middleware weiter | 2026-06-23 |
+| Login/Logout/Passwort ändern als Client-Aktionen über Supabase-Browser-Client | Entspricht Auth-Best-Practices (Redirect via `window.location.href`, Session-Prüfung vor Weiterleitung) | 2026-06-23 |
+| Formulare mit react-hook-form + Zod | Bereits vorhanden; saubere Validierung (Pflichtfelder, Passwort-Match, Mindestlänge) | 2026-06-23 |
+| shadcn/ui-Komponenten (Card, Input, Label, Button, Dialog, Form) | Bereits installiert; keine Eigenbauten | 2026-06-23 |
+| Rückmeldungen via „sonner"-Toasts | Erfolgs-/Fehlermeldungen; bereits installiert | 2026-06-23 |
+| Platzhalter-Route `/tools/multi-channel-marketing` | Erweiterbar für künftige Tools/Kalender; PROJ-6 ersetzt nur den Inhalt | 2026-06-23 |
+| `middleware.ts` → `proxy.ts` umbenennen | Behebt BUG-2 aus PROJ-1-QA (Next.js-16-Konvention) | 2026-06-23 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Überblick
+PROJ-2 baut die erste sichtbare UI auf dem PROJ-1-Fundament auf: Login-Seite, geschütztes Dashboard (Hub), Platzhalter-Tool-Seite, Logout und freiwillige Passwortänderung. Kein neues Datenbankschema — nur Auth-Sitzung und der Anzeigename aus `profiles`.
+
+### Seiten- & Komponenten-Struktur
+```
+/login  (öffentlich)
+└── Login-Karte
+    ├── Firmenlogo (agon's world)
+    ├── E-Mail-Feld
+    ├── Passwort-Feld
+    ├── Fehlermeldung (falsche Daten / Verbindungsfehler)
+    └── Login-Button (Ladezustand, während Anfrage deaktiviert)
+
+/  (Dashboard — geschützt)
+├── Kopfzeile: Firmenlogo + "Eingeloggt als [Anzeigename]"
+├── Tool-Bereich: Kachel "Multi-Channel-Marketing" → /tools/multi-channel-marketing
+└── Konto-Bereich: "Passwort ändern" (Dialog) + Logout-Button
+
+/tools/multi-channel-marketing  (Platzhalter — geschützt)
+└── "Jahreskalender — kommt in Kürze"  (wird in PROJ-6 ersetzt)
+
+Route-Schutz (Middleware/Proxy aus PROJ-1):
+├── nicht eingeloggt + geschützte Seite → /login
+└── eingeloggt + /login → Dashboard
+```
+
+### Datenmodell
+Keine neuen Tabellen. Genutzt wird:
+- Anmeldung/Sitzung über Supabase Auth (`auth.users`)
+- Anzeigename für die Begrüßung aus `profiles.display_name`
+- Passwortänderung aktualisiert das Passwort des eingeloggten Nutzers in Supabase Auth
+
+### Auth-Flüsse
+- **Login:** Client-Formular → `signInWithPassword` → Session-Prüfung → Redirect zum Dashboard
+- **Logout:** Client `signOut` → Redirect zur Login-Seite
+- **Passwort ändern:** Dialog → `updateUser` (neues Passwort) → Erfolgs-Toast
+- **Schutz:** Middleware/Proxy prüft Session serverseitig und leitet entsprechend um
+
+### Benötigte Pakete
+Keine neuen. Vorhanden: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookform/resolvers`, `sonner` und die nötigen shadcn/ui-Komponenten.
+
+### Assets
+- Firmenlogo unter `public/agonsworld-logo-white-background.jpg` (vorhanden)
+- Abgeleitetes Farbschema: dunkles Waldgrün + Salbeigrün als Akzentfarben
 
 ## QA Test Results
 _To be added by /qa_
