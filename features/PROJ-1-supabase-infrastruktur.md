@@ -120,6 +120,29 @@ App-Fundament
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
+## Implementation Notes (Backend)
+**Stand:** 2026-06-23 — implementiert gegen Supabase-Projekt „Multi-Channel-Marketing" (`grtqmrnjjsucskdeghrr`).
+
+**Datenbank (über Supabase-Migrations):**
+- Migration `create_profiles_table`: Tabelle `public.profiles` (`id` → `auth.users` mit `ON DELETE CASCADE`, `display_name`, `created_at`), RLS aktiviert.
+  - RLS-Policies: alle Authentifizierten dürfen **alle** Profile lesen (für „wer hat was gemacht"); INSERT/UPDATE nur auf das **eigene** Profil (`auth.uid() = id`).
+  - Trigger `on_auth_user_created` → Funktion `handle_new_user()` legt automatisch ein Profil an (Anzeigename aus `raw_user_meta_data.display_name`, Fallback E-Mail).
+- Migration `restrict_handle_new_user_execute`: `EXECUTE` auf `handle_new_user()` von `public`/`anon`/`authenticated` entzogen (Funktion nur per Trigger nutzbar). Behebt 2 Security-Advisor-Warnungen.
+- Security-Advisors nach Migration: **0 Befunde**.
+
+**App-Anbindung:**
+- `@supabase/ssr` installiert.
+- `src/lib/supabase/client.ts` (Browser), `src/lib/supabase/server.ts` (Server/Route Handler), `src/lib/supabase/middleware.ts` + `src/middleware.ts` (Session-Refresh bei jedem Request).
+- Alter Platzhalter `src/lib/supabase.ts` entfernt.
+- `.env.local` mit Projekt-URL und Publishable Key angelegt (gitignored).
+- `npx tsc --noEmit`: fehlerfrei.
+
+**Abweichung von der Spec:** Profil-Schreibzugriff auf das eigene Profil beschränkt (statt „Vollzugriff für alle"), da das Bearbeiten fremder Anzeigenamen nicht sinnvoll ist. Lesen bleibt für alle Authentifizierten offen. Künftige Arbeitsbereich-Tabellen (Marketplaces/Marken/Aktionen) erhalten weiterhin vollen Schreibzugriff für alle Authentifizierten.
+
+**⚠️ Manueller Schritt (nicht per API/MCP möglich):** Öffentliches Sign-up im Supabase-Dashboard deaktivieren — **Authentication → Sign In / Providers → Email → „Allow new users to sign up" deaktivieren**. Erst danach ist garantiert, dass nur der Admin Accounts anlegen kann (AC: „öffentliche Registrierung deaktiviert").
+
+**Hinweis zu Tests:** PROJ-1 enthält keine API-Routen (Login-UI/-Flows folgen in PROJ-2), daher keine Route-Integrationstests. Verifikation erfolgt im `/qa`-Schritt gegen die Akzeptanzkriterien.
+
 ## QA Test Results
 _To be added by /qa_
 
