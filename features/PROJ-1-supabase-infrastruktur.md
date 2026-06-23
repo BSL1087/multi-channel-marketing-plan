@@ -65,12 +65,60 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| Supabase Auth mit E-Mail/Passwort, öffentliches Sign-up deaktiviert | Erfüllt „nur Admin legt Accounts an" ohne eigenen Code | 2026-06-23 |
+| Admin vergibt Erst-Passwort direkt (kein E-Mail-/Invite-Flow); Accounts werden bestätigt angelegt | Wunsch des Kunden; kein E-Mail-Versand nötig, einfachster Weg für kleinen Kreis | 2026-06-23 |
+| Separate Profil-Tabelle (`profiles`) statt Namen im Auth-Account | Supabase trennt geschützte Login-Daten von App-Daten; Anzeigename gehört in eigene Tabelle | 2026-06-23 |
+| Automatischer Trigger erstellt Profil bei neuem Account | Verhindert Accounts ohne Profil (kein verwaister Zustand) | 2026-06-23 |
+| Audit-Spalten (`created_by`, `created_at`, `updated_by`, `updated_at`) als Standard für alle künftigen Tabellen | Ermöglicht Aktivitätsprotokoll (PROJ-9) ohne spätere Migration | 2026-06-23 |
+| Schema-Änderungen über Supabase-Migrations (MCP) | Versioniert & nachvollziehbar, passt zum Git-Workflow | 2026-06-23 |
+| Ein zentraler Supabase-Client + `@supabase/ssr` für Next.js | Sichere Sitzungsverwaltung über Server- & Client-Komponenten; eine wiederverwendbare Verbindung | 2026-06-23 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Überblick
+PROJ-1 ist ein Fundament-Feature: Es liefert die Supabase-Verbindung, die Auth-Konfiguration, eine Profil-Tabelle und das durchgängige Sicherheitsmodell (RLS). Sichtbare UI (Login-Seite) folgt in PROJ-2. Das Supabase-Projekt „Multi-Channel-Marketing" (Region eu-central-1, Postgres 17) existiert bereits und ist aktiv; das `public`-Schema ist noch leer.
+
+### Komponenten-Struktur
+```
+App-Fundament
+├── Supabase-Verbindung (zentraler Client für die ganze App)
+├── Auth-Konfiguration (E-Mail/Passwort, Sign-up deaktiviert, Admin vergibt Passwort)
+├── Profil-Tabelle (Anzeigename je Account)
+├── Automatische Profil-Erstellung (Trigger bei neuem Account)
+└── Sicherheits-Regelwerk (RLS-Konvention für alle künftigen Tabellen)
+```
+
+### Datenmodell (in einfacher Sprache)
+
+**Profil** — ergänzt jeden Login-Account um menschenlesbare Infos:
+- Verknüpfung zum Login-Account (1:1)
+- Anzeigename (z.B. „Max Mustermann")
+- Erstellt-Zeitstempel
+- Wird automatisch gelöscht, wenn der zugehörige Account gelöscht wird
+
+**Audit-Konvention** — Vorlage für ALLE späteren Tabellen (Marketplaces, Marken, Aktionen):
+- erstellt von (welcher Nutzer) / erstellt am (Zeitstempel)
+- zuletzt geändert von (welcher Nutzer) / zuletzt geändert am (Zeitstempel)
+
+**Sicherheits-Regelwerk (RLS):**
+- Nicht eingeloggt → gar kein Zugriff
+- Eingeloggt → voller Lese-/Schreibzugriff auf den gemeinsamen Arbeitsbereich
+
+### Auth-Konfiguration
+- Methode: E-Mail + Passwort
+- Öffentliches Sign-up: **deaktiviert**
+- Erst-Passwort: Admin vergibt es direkt im Supabase-Dashboard; Accounts werden bestätigt angelegt (kein E-Mail-/Invite-Flow)
+
+### Benötigte Pakete
+- `@supabase/supabase-js` — bereits installiert (offizieller Supabase-Client)
+- `@supabase/ssr` — sichere Sitzungsverwaltung in Next.js (Server- & Client-Komponenten)
+
+### Umgebungsvariablen
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 ## QA Test Results
 _To be added by /qa_
