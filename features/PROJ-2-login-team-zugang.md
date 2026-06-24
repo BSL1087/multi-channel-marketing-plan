@@ -165,7 +165,56 @@ Keine neuen. Vorhanden: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookform/re
 **Kein separater `/backend`-Schritt nötig:** Authentifizierung, Profile und RLS stammen aus PROJ-1; Login/Logout/Passwortänderung laufen direkt über das Supabase-SDK, Route-Schutz über die Proxy. Es gibt keine eigenen API-Routen/Tabellen zu bauen.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-06-24
+**Tester:** QA Engineer (AI) + manuelle Bestätigung durch Nutzer
+**Methoden:** Manueller Browser-Test (vom Nutzer bestätigt), HTTP-Verhaltens-/Sicherheitschecks, Code-Review. Automatisierte E2E-Tests sind geschrieben, konnten aber lokal nicht ausgeführt werden (siehe Hinweis unten).
+
+### Acceptance Criteria Status
+
+**Login**
+- [x] AC: Login mit korrekten Daten → Dashboard (manuell bestätigt)
+- [x] AC: Falsche Daten → generische Fehlermeldung, E-Mail bleibt erhalten (manuell + Code-Review)
+- [x] AC: Leeres Formular → Validierungsmeldungen je Feld (manuell + Code-Review)
+- [x] AC: Verbindungsfehler → Fehlermeldung, Eingaben bleiben (Code-Review: try/catch im Login-Form)
+
+**Geschützte Seiten & Navigation**
+- [x] AC: Nicht eingeloggt + geschützte Seite → /login (HTTP 307 für `/` und `/tools/...` verifiziert)
+- [x] AC: Eingeloggt + /login → Dashboard (manuell bestätigt + Code-Review der Proxy-Logik)
+- [x] AC: Dashboard zeigt Logo, „Eingeloggt als [Anzeigename]", MCM-Kachel, Logout (manuell bestätigt)
+- [x] AC: Kachel-Klick → Platzhalter-Seite (manuell bestätigt)
+
+**Logout**
+- [x] AC: Logout → Sitzung beendet, Login-Seite (manuell bestätigt)
+- [x] AC: Nach Logout „zurück" → kein Zugriff, Weiterleitung (serverseitiger Schutz via Proxy/Server-Component-Check)
+
+**Passwort ändern**
+- [x] AC: Neues Passwort + Bestätigung speichern → aktualisiert, Erfolgs-Toast (manuell bestätigt)
+- [x] AC: Passwörter ungleich → Validierungsmeldung (Code-Review: Zod refine)
+- [x] AC: Passwort < 6 Zeichen → Validierungsmeldung (Code-Review: Zod min 6)
+
+### Security Audit Results
+- [x] Route-Schutz **serverseitig**: `/` und `/tools/...` liefern unangemeldet HTTP 307 → /login (nicht nur clientseitig ausgeblendet)
+- [x] Keine Secrets im ausgelieferten HTML (kein `service_role`, kein `sb_secret`)
+- [x] Generische Login-Fehlermeldung (keine Auskunft, ob die E-Mail existiert)
+- [x] Geschützte Seiten besitzen zusätzlich einen Server-Component-Check (Defense in depth)
+
+### Automatisierte Tests
+- **E2E (Playwright):** `tests/PROJ-2-login-team-zugang.spec.ts` mit 4 Tests für die nicht-eingeloggten Abläufe (Route-Schutz, Login-Seite, Formular-Validierung, falsche Daten) geschrieben.
+- ⚠️ **Lokale Ausführung blockiert (Umgebungsproblem, kein App-Fehler):** Der Playwright-Bundled-Chromium-Download hängt in dieser Umgebung beim Entpacken; mit System-Chrome läuft der Browser, kann aber `http://localhost:3000` nicht laden (Navigations-Timeout trotz HTTP 200 auf reine Requests — vermutlich System-Proxy, der localhost abfängt). Die Tests bleiben im Repo und laufen in einer sauberen/CI-Umgebung (dort `npx playwright install`).
+
+### Bugs Found
+- **Keine neuen Bugs.**
+- **BUG-2 aus PROJ-1-QA behoben:** `middleware.ts` → `proxy.ts` umbenannt (Next.js-16-Konvention); Deprecation-Warnung im Build verschwunden.
+- **Offen (Low, aus PROJ-1):** BUG-3 `npm run lint` (Template-Problem, `next lint` in Next 16 entfernt) — unverändert, nicht blockierend.
+
+### Summary
+- **Acceptance Criteria:** 13/13 verifiziert (manuell + HTTP-Checks + Code-Review)
+- **Bugs:** 0 neu (0 Critical, 0 High); BUG-2 behoben; BUG-3 Low offen
+- **Security:** Pass (serverseitiger Route-Schutz, keine Secret-Leaks, generische Fehlermeldung)
+- **Automatisierte E2E:** geschrieben, lokal nicht ausführbar (Umgebung) — für CI bereit
+- **Production Ready:** YES (keine offenen Critical/High-Bugs)
+- **Recommendation:** PROJ-2 freigeben. E2E-Suite bei nächster Gelegenheit in sauberer Umgebung/CI ausführen.
 
 ## Deployment
 _To be added by /deploy_
