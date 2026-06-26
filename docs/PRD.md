@@ -15,7 +15,7 @@ Marketing-Teams (mehrere gleichberechtigte Nutzer), die parallel auf mehreren Ma
 | P0 (MVP) | Marketplaces & Webshops verwalten | Planned |
 | P0 (MVP) | Produktgruppen verwalten | Planned |
 | P0 (MVP) | Marken verwalten (mit individueller Farbe) | Planned |
-| P0 (MVP) | Rabatt-Aktionen anlegen & bearbeiten | Roadmap |
+| P0 (MVP) | Rabatt-Aktionen anlegen & bearbeiten | Planned |
 | P0 (MVP) | Jahreskalender-Übersicht | Roadmap |
 | P0 (MVP) | Kannibalisierungs-Warnung | Roadmap |
 | P1 | Monats-Zoom / Tagesansicht | Roadmap |
