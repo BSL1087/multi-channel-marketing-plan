@@ -19,7 +19,7 @@
 | PROJ-2 | Login / Team-Zugang | Approved | P0 | PROJ-1 | PROJ-2-login-team-zugang.md | 2026-06-23 |
 | PROJ-3 | Marketplaces & Webshops verwalten | Approved | P0 | PROJ-1, PROJ-2 | PROJ-3-marketplaces-webshops-verwalten.md | 2026-06-23 |
 | PROJ-4 | Marken verwalten (mit Farbe) | Approved | P0 | PROJ-1, PROJ-2, PROJ-11 | PROJ-4-marken-verwalten.md | 2026-06-23 |
-| PROJ-5 | Rabatt-Aktionen anlegen & bearbeiten | Planned | P0 | PROJ-3, PROJ-4 | PROJ-5-rabatt-aktionen-anlegen-bearbeiten.md | 2026-06-23 |
+| PROJ-5 | Rabatt-Aktionen anlegen & bearbeiten | Architected | P0 | PROJ-3, PROJ-4 | PROJ-5-rabatt-aktionen-anlegen-bearbeiten.md | 2026-06-23 |
 | PROJ-6 | Jahreskalender-Übersicht | Roadmap | P0 | PROJ-5 | — | 2026-06-23 |
 | PROJ-7 | Kannibalisierungs-Warnung | Roadmap | P0 | PROJ-5 | — | 2026-06-23 |
 | PROJ-8 | Monats-Zoom / Tagesansicht | Roadmap | P1 | PROJ-6 | — | 2026-06-23 |

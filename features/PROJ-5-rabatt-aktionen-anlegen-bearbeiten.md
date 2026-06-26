@@ -95,12 +95,72 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| Eigene `discount_actions`-Tabelle, Muster wie bisher | Konsistenz; Grundlage für Kalender (PROJ-6) und Warnung (PROJ-7) | 2026-06-26 |
+| Server Component + Server-Aktionen (kein `/api`) | Läuft mit Nutzer-Sitzung (RLS greift); konsistent | 2026-06-26 |
+| Natives `<input type="date">` für Start/Ende | Kein neues Paket (kein react-day-picker); gültige Werte, Browser-Lokalisierung | 2026-06-26 |
+| FK zu Marke und Kanal mit **ON DELETE CASCADE** | Setzt „Mitlöschen nach Warnung" um; keine verwaisten Aktionen | 2026-06-26 |
+| `end_date >= start_date` als DB-Check-Constraint | Schutz auch bei direktem DB-Zugriff | 2026-06-26 |
+| Feldlängen: Titel ≤ 80, Rabattwert ≤ 50, Kommentar ≤ 500 (DB-Checks) | Verhindert Layout-Probleme im Kalender; klare Grenzen | 2026-06-26 |
+| Keine Eindeutigkeits-/Überschneidungssperre | Überschneidungen erlaubt; davor warnt PROJ-7 | 2026-06-26 |
+| Anzahl-Warnung in PROJ-3/PROJ-4-Lösch-Dialogen (Vorzählung der Aktionen) | App zählt betroffene Aktionen vor dem Cascade-Löschen | 2026-06-26 |
+| Geteiltes `action-validation.ts` (Zod: Felder + Datumsregel) | Server-Aktion und Formular nutzen dieselben Regeln | 2026-06-26 |
+| Audit-Trigger + RLS wie PROJ-1/3/4/11 | Konsistente Sicherheits-/Audit-Konvention | 2026-06-26 |
+| Keine neuen Pakete | Alles (inkl. Select) bereits installiert; Datum nativ | 2026-06-26 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+**Stand:** 2026-06-26
+
+### Überblick
+PROJ-5 folgt dem etablierten Bauplan (eigene Tabelle + geschützte Verwaltungsseite mit Anlegen/Bearbeiten/Löschen über Server-Aktionen). Neu: zwei Auswahl-Felder (Kanal, Marke per Select), zwei Datumsfelder (nativ) mit Regel „Ende ≥ Start", und eine **Cascade-Beziehung** zu Marke/Kanal. Querschnittlich werden die Lösch-Dialoge von PROJ-3/PROJ-4 um eine **Anzahl-Warnung** ergänzt. Keine neuen Pakete.
+
+### Seiten- & Komponenten-Struktur
+```
+/tools/multi-channel-marketing/aktionen   (geschützte Seite)
+└── Seite "Rabatt-Aktionen verwalten"
+    ├── Kopfzeile: Titel + Zurück-Link
+    ├── "Aktion hinzufügen"-Button
+    ├── Aktions-Liste (Table, sortiert nach Startdatum)
+    │   └── Titel · Marke (Swatch+Name) · Kanal · Zeitraum · Rabattwert · Bearbeiten · Löschen
+    ├── Leerzustand A: keine Aktion
+    ├── Leerzustand B: keine Marke ODER kein Kanal → Hinweis + Links (Anlegen gesperrt)
+    ├── Dialog "Aktion anlegen / bearbeiten":
+    │   Titel · Kanal (Select) · Marke (Select) · Start (date) · Ende (date) · Rabattwert · Kommentar
+    └── Bestätigungsdialog "Aktion löschen?"
+
+Querschnitt:
+├── PROJ-3 delete-channel-dialog: zeigt „X Aktionen werden mitgelöscht"
+└── PROJ-4 delete-brand-dialog: zeigt „X Aktionen werden mitgelöscht"
+
+Dashboard (/): fünfte Kachel „Rabatt-Aktionen".
+```
+
+Bausteine (analog bisher): `action-manager` (Liste + Dialoge), `action-form-dialog` (Anlegen & Bearbeiten), `delete-action-dialog`, `action-validation.ts`. Zusätzlich Zähl-Server-Aktionen für die Lösch-Warnungen bei Marke/Kanal.
+
+### Datenmodell (in einfacher Sprache)
+**Rabatt-Aktion (`discount_actions`):**
+- Eindeutige ID
+- Titel (Pflicht, ≤ 80) · Rabattwert (Pflicht, Freitext ≤ 50) · Kommentar (optional, ≤ 500)
+- Kanal (Pflicht, Verweis auf Marketplace) · Marke (Pflicht, Verweis auf Marke)
+- Startdatum / Enddatum (Pflicht, Ende ≥ Start)
+- erstellt von/am · zuletzt geändert von/am
+
+Gespeichert in: **Supabase**, eigene Tabelle, RLS wie PROJ-1. Kanal- und Marken-Verweis mit **ON DELETE CASCADE**. Keine Eindeutigkeits-/Überschneidungssperre.
+
+### Abläufe (was passiert wann)
+- **Liste:** serverseitig laden (mit Marken-/Kanalnamen + Markenfarbe), nach Startdatum sortiert. Keine Marke/kein Kanal → Leerzustand B; sonst keine Aktion → Leerzustand A.
+- **Anlegen/Bearbeiten:** Dialog → Validierung (Pflichtfelder, Längen, Ende ≥ Start) → Speichern → Liste aktualisiert, Toast.
+- **Löschen Aktion:** Bestätigung → entfernt.
+- **Löschen Marke/Kanal:** App zählt zugeordnete Aktionen → Warnung mit Anzahl → nach Bestätigung Cascade-Löschen.
+
+### Benötigte Pakete
+Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookform/resolvers`, `sonner`, shadcn/ui (Card, Table, Dialog, AlertDialog, Form, Input, Label, Button, Select). Datum = natives Browser-Element.
+
+### Was dieses Feature NICHT enthält (Architektur-Sicht)
+- Keine Kalender-/Timeline-Darstellung (PROJ-6), keine Überschneidungs-Warnung (PROJ-7).
+- Kein Anlegen direkt im Kalender, keine Filter/Suche, keine Serien-Aktionen.
 
 ## QA Test Results
 _To be added by /qa_
