@@ -115,13 +115,73 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| _To be added by /architecture_ | | |
+| Eigene `brands`-Tabelle in Supabase, Muster wie PROJ-3/PROJ-11 | Team-weit geteilte Stammdaten; Grundlage für Aktionen (PROJ-5) und Kalender (PROJ-6) | 2026-06-26 |
+| Server Component + Server-Aktionen (kein `/api`-Endpunkt) | Schreiben/Löschen mit Nutzer-Sitzung (RLS greift); konsistent mit Kanälen/Gruppen | 2026-06-26 |
+| Nativer `<input type="color">` als Hex-Wähler | Kein neues Paket; erfüllt freie Farbwahl; liefert immer gültiges `#rrggbb` | 2026-06-26 |
+| Eindeutigkeit **pro Gruppe** auf DB-Ebene (Unique-Index auf `product_group_id` + `lower(trim(name))`) | Letzte Sicherung gegen Races; erlaubt gleichen Namen in anderer Gruppe | 2026-06-26 |
+| Farbe als DB-Check-Constraint (`^#[0-9A-Fa-f]{6}$`) | Verhindert ungültige Farbwerte auch bei direktem DB-Zugriff | 2026-06-26 |
+| Fremdschlüssel `product_group_id` → `product_groups(id)` **ON DELETE RESTRICT** | Erfüllt den PROJ-11-Vertrag (Lösch-Sperre der Gruppe entsteht genau hier) | 2026-06-26 |
+| Weiche Farb-Kollisionswarnung nur App-seitig (live im Formular), keine DB-Regel | „Warnen statt blockieren"; nennt die kollidierende Marke, Speichern bleibt möglich | 2026-06-26 |
+| Geteiltes Modul `brand-validation.ts`; `isDuplicateName` aus `channel-validation` wiederverwendet, plus `isDuplicateBrandInGroup` | Server-Aktion und Formular nutzen dieselben Regeln; keine Dopplung | 2026-06-26 |
+| Audit-Spalten serverseitig per Trigger | Übernimmt PROJ-1/PROJ-3/PROJ-11-Konvention | 2026-06-26 |
+| Keine neuen Pakete | Card, Table, Dialog, AlertDialog, Form, Input, Label, Button, Select, sonner, react-hook-form, zod bereits installiert | 2026-06-26 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+**Stand:** 2026-06-26
+
+### Überblick
+PROJ-4 folgt 1:1 dem Bauplan von PROJ-3/PROJ-11 (eigene Tabelle + geschützte Verwaltungsseite mit Anlegen/Bearbeiten/Löschen über Server-Aktionen). Zusätzlich: ein **Farb-Attribut** (nativer Hex-Picker, weiche Kollisionswarnung) und eine **Pflicht-Zuordnung zu einer Produktgruppe** (Select, befüllt aus PROJ-11). Die `brands`-Tabelle trägt den Fremdschlüssel mit `ON DELETE RESTRICT` und macht damit die in PROJ-11 vorbereitete Lösch-Sperre scharf. Keine neuen Pakete.
+
+### Seiten- & Komponenten-Struktur
+```
+/tools/multi-channel-marketing/marken   (geschützte Stammdaten-Seite)
+└── Seite "Marken verwalten"
+    ├── Kopfzeile: Titel + Zurück-Link zum Dashboard
+    ├── "Marke hinzufügen"-Button
+    ├── Marken-Liste (Table, sortiert nach Gruppe, dann Name)
+    │   └── je Zeile: Farb-Swatch · Name · Produktgruppe · "Bearbeiten" · "Löschen"
+    ├── Leerzustand A: keine Marke (Gruppen vorhanden) → Hinweis + "hinzufügen"
+    ├── Leerzustand B: keine Produktgruppe → Hinweis + Link zur Produktgruppen-Verwaltung (Anlegen gesperrt)
+    ├── Dialog "Marke anlegen / bearbeiten": Name · Farbwähler (Vorschlagsfarbe) · Produktgruppen-Select
+    │   └── weiche Farb-Kollisionswarnung (nennt die kollidierende Marke; blockiert nicht)
+    └── Bestätigungsdialog "Marke löschen?"
+
+Route-Schutz (aus PROJ-2): nicht eingeloggt → /login
+Dashboard (/) bekommt eine vierte Kachel „Marken verwalten".
+```
+
+Geplante Bausteine (analog `product-group-*`): `brand-manager` (Liste + Dialoge orchestrieren), `brand-form-dialog` (Anlegen **und** Bearbeiten, ein Dialog), `delete-brand-dialog`, sowie `brand-validation.ts` (geteilte Regeln).
+
+### Datenmodell (in einfacher Sprache)
+**Marke (`brands`):**
+- Eindeutige ID
+- **Name** — Pflicht, max. 60 Zeichen
+- **Farbe** — Pflicht, gültiger Hex-Wert `#RRGGBB`
+- **Produktgruppe** — Pflicht, verweist auf eine bestehende Gruppe (PROJ-11)
+- erstellt von / erstellt am · zuletzt geändert von / zuletzt geändert am
+
+Gespeichert in: **Supabase**, eigene Tabelle, RLS wie PROJ-1. Eindeutigkeit des Namens **pro Gruppe** (case-insensitive/getrimmt), zusätzlich DB-seitig. Farbe per DB-Check-Constraint validiert.
+
+**Beziehung zu Produktgruppen (PROJ-11):** Jede Marke verweist auf genau eine Gruppe; der Fremdschlüssel ist `ON DELETE RESTRICT` → eine Gruppe mit zugeordneten Marken kann nicht gelöscht werden (macht die PROJ-11-Sperre wirksam).
+
+**Sicherheits-Regelwerk (RLS), wie PROJ-1/PROJ-3/PROJ-11:** anon → kein Zugriff; eingeloggt → volles Lesen/Schreiben/Löschen.
+
+### Abläufe (was passiert wann)
+- **Liste:** Beim Öffnen serverseitig laden (mit Gruppennamen), sortiert nach Gruppe, dann Name. Keine Gruppe vorhanden → Leerzustand B; Gruppen aber keine Marke → Leerzustand A.
+- **Anlegen/Bearbeiten:** Dialog mit Name, Farbwähler (Vorschlagsfarbe vorbelegt), Gruppen-Select → Validierung (Pflicht, Länge, Hex, Duplikat pro Gruppe) → Speichern → Liste aktualisiert, Erfolgsmeldung. Live-Warnung, wenn die Farbe exakt schon vergeben ist (nennt die Marke), Speichern bleibt möglich.
+- **Löschen:** Bestätigungsdialog → bei Bestätigung entfernt. (Warnung bei verknüpften Aktionen kommt erst mit PROJ-5.)
+- **Fehlerfälle:** Verbindungs-/Serverfehler → Toast, Eingabe bleibt; zwischenzeitlich gelöschte Marke beim Bearbeiten → Hinweis; Duplikate von Oberfläche und DB abgewiesen.
+
+### Benötigte Pakete
+Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookform/resolvers`, `sonner` sowie shadcn/ui Card, Table, Dialog, AlertDialog, Form, Input, Label, Button, Select. Farbwähler = natives Browser-Element.
+
+### Was dieses Feature NICHT enthält (Architektur-Sicht)
+- Keine Produktgruppen-CRUD (PROJ-11) — nur Zuordnung per Dropdown.
+- Keine Verknüpfung mit Aktionen (PROJ-5), kein Logo-Upload (PROJ-10), keine Kalender-Darstellung (PROJ-6).
+- Kein Rollen-/Rechtekonzept; keine harte Farb-Eindeutigkeit.
 
 ## QA Test Results
 _To be added by /qa_
