@@ -1,8 +1,8 @@
 # PROJ-4: Marken verwalten (mit Farbe)
 
-## Status: Planned
+## Status: Approved
 **Created:** 2026-06-25
-**Last Updated:** 2026-06-25
+**Last Updated:** 2026-06-26
 
 ## Dependencies
 - Requires: PROJ-1 (Supabase-Infrastruktur) — für DB, RLS und Audit-Spalten (`created_by`/`created_at`/`updated_by`/`updated_at`).
@@ -235,7 +235,67 @@ Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookf
 **Hinweis:** Migration direkt über den Supabase-MCP angewandt (die `/backend`-Skill war wegen Root-Workspace-Scoping nicht als Slash-Command verfügbar; Vorgehen folgt 1:1 dem dokumentierten Backend-Vertrag).
 
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-06-26
+**Tester:** QA Engineer (AI) + manuelle Bestätigung durch Nutzer
+**Methoden:** Unit-Tests (Vitest), Build/TypeScript, HTTP-Route-Schutz, funktionale DB-Verifikation (Backend), Code-Review, manueller Browser-Smoke-Test. E2E-Spec geschrieben, lokal nicht ausführbar (Umgebung).
+
+### Acceptance Criteria Status
+
+**Anzeigen & Leerzustand**
+- [x] Liste mit Farb-Swatch · Name · Gruppe + „Marke hinzufügen" (Smoke-Test + Code-Review)
+- [x] Leerzustand „keine Marke" (Code-Review: `BrandManager`)
+- [x] Leerzustand „keine Produktgruppe" → Anlegen gesperrt + Link (Code-Review; Fitness/Familie vorhanden, daher manuell nicht ausgelöst)
+- [x] Nicht eingeloggt → /login (HTTP 307 verifiziert)
+
+**Anlegen**
+- [x] Name + Gruppe + Speichern → erscheint + Erfolgsmeldung (Smoke-Test)
+- [x] Vorschlagsfarbe vorbelegt, per Hex-Picker änderbar (Smoke-Test + Code-Review)
+- [x] Leerer Name → Validierung (Unit-Test + Zod)
+- [x] Keine Gruppe → Validierung (Unit-Test `productGroupIdSchema` + Select-Pflicht)
+- [x] Duplikat in gleicher Gruppe → abgewiesen (Smoke-Test + Unit-Test + DB-`23505`)
+- [x] Gleicher Name in anderer Gruppe → erlaubt (Smoke-Test + Unit-Test + DB-Check)
+- [x] Name > 60 → Validierung (Unit-Test + DB-Check-Constraint)
+- [x] Exakt gleiche Farbe → weiche Warnung, Speichern möglich (Smoke-Test + Code-Review)
+
+**Bearbeiten**
+- [x] Name/Farbe/Gruppe ändern → übernommen (Smoke-Test)
+- [x] Gruppenwechsel mit Namens-Kollision → Duplikat-Hinweis (Unit-Test Self-Exclude/Clash)
+- [x] Leer/Duplikat/zu lang beim Bearbeiten → dieselben Regeln (Unit-Test + Code-Review)
+
+**Löschen**
+- [x] Bestätigungsdialog vor Entfernen (Smoke-Test)
+- [x] Bestätigen → entfernt + Erfolgsmeldung (Smoke-Test)
+- [x] Abbrechen → bleibt bestehen (Code-Review AlertDialog)
+
+**Speichern & Audit**
+- [x] Audit-Spalten serverseitig gesetzt (Backend: Trigger `brands_set_audit` verifiziert)
+- [x] Speicherfehler → Fehlermeldung, Eingabe bleibt (Code-Review Fehlerpfade)
+
+### Security Audit Results
+- [x] Route-Schutz serverseitig: `/marken` → HTTP 307 → /login
+- [x] RLS nach PROJ-1-Konvention: anon Default-Deny, authenticated voll (0 brands-Advisor-Befunde)
+- [x] Farbe per DB-Check-Constraint (`^#[0-9A-Fa-f]{6}$`); Name-Länge per Check-Constraint
+- [x] Eindeutigkeit pro Gruppe per Unique-Index (`lower(trim(name))`) — Race-sicher
+- [x] **Gruppen-Lösch-Sperre scharf:** FK `ON DELETE RESTRICT` per SQL bestätigt (`foreign_key_violation`)
+- [x] Audit-Trigger-Funktion gehärtet (EXECUTE entzogen)
+
+### Automatisierte Tests
+- **Unit (Vitest):** 33/33 grün mit `npx vitest run --pool=threads` (davon 18 für `brand-validation`).
+- **Funktionale DB-Checks:** 6/6 bestanden (siehe Backend-Notizen).
+- **E2E (Playwright):** `tests/PROJ-4-marken-verwalten.spec.ts` (Route-Schutz) geschrieben. ⚠️ Lokal nicht ausführbar (Umgebung) — für CI vorgesehen.
+
+### Bugs Found
+- **Keine.** (0 Critical, 0 High, 0 Medium, 0 Low)
+- **Behoben während QA (Infrastruktur, kein Feature-Bug):** Hängender Dev-Server (Port 3000) → Zombie-Prozesse beendet, `.next/dev/lock` entfernt, frisch gestartet.
+- **Offen (projektweit, nicht PROJ-4):** Advisor `auth_leaked_password_protection` (manueller Auth-Schalter im Dashboard) — Low, nicht blockierend.
+
+### Summary
+- **Acceptance Criteria:** alle verifiziert (Unit-Tests + DB-Checks + Code-Review + manueller Smoke-Test)
+- **Bugs:** 0
+- **Security:** Pass (serverseitiger Route-Schutz, RLS Default-Deny, DB-Constraints, FK-Lösch-Sperre, gehärteter Trigger)
+- **Production Ready:** YES
+- **Recommendation:** PROJ-4 freigeben. E2E-Suite bei Gelegenheit in sauberer Umgebung/CI ausführen.
 
 ## Deployment
 _To be added by /deploy_
