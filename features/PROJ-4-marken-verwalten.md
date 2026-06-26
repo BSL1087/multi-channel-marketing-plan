@@ -1,0 +1,130 @@
+# PROJ-4: Marken verwalten (mit Farbe)
+
+## Status: Planned
+**Created:** 2026-06-25
+**Last Updated:** 2026-06-25
+
+## Dependencies
+- Requires: PROJ-1 (Supabase-Infrastruktur) — für DB, RLS und Audit-Spalten (`created_by`/`created_at`/`updated_by`/`updated_at`).
+- Requires: PROJ-2 (Login / Team-Zugang) — für eingeloggten Zugang und serverseitig geschützte Seiten.
+- Requires: PROJ-11 (Produktgruppen verwalten) — liefert die Liste der Produktgruppen, der jede Marke zugeordnet wird. **Hinweis:** PROJ-11 wurde im Zuge dieses Specs neu angelegt (Status Roadmap) und muss vor dem produktiven Einsatz von PROJ-4 spezifiziert und gebaut werden.
+
+## User Stories
+- Als **Team-Mitglied** möchte ich eine Liste aller Marken mit ihrer Farbe und Produktgruppe sehen, damit ich den Überblick über alle Marken habe, für die wir Aktionen planen.
+- Als **Team-Mitglied** möchte ich eine neue Marke anlegen (Name + Farbe + Produktgruppe), damit die Marke später im Jahreskalender (PROJ-6) farblich wiedererkennbar und nach Gruppe filterbar ist.
+- Als **Team-Mitglied** möchte ich die Farbe einer Marke frei wählen (Hex-Farbwähler), damit ich gut unterscheidbare Farben für meine Marken vergeben kann.
+- Als **Team-Mitglied** möchte ich eine bestehende Marke bearbeiten (Name, Farbe, Produktgruppe ändern), damit ich Tippfehler korrigieren, die Farbe anpassen oder die Marke einer anderen Gruppe zuordnen kann.
+- Als **Team-Mitglied** möchte ich eine Marke löschen (mit Sicherheitsabfrage), damit nicht mehr genutzte Marken die Übersicht nicht überladen.
+- Als **Team-Mitglied** möchte ich beim ersten Aufruf einen klaren Hinweis sehen, wenn noch keine Marke (oder noch keine Produktgruppe) existiert, damit ich weiß, was ich zuerst tun muss.
+
+## Out of Scope
+- **Produktgruppen-Verwaltung (CRUD)** → **PROJ-11**. PROJ-4 ordnet Marken nur einer bestehenden Gruppe zu (Dropdown) und legt selbst keine Gruppen an/um/löscht sie. Verhalten beim Löschen einer Produktgruppe, die noch Marken enthält, wird in PROJ-11 entschieden.
+- **Verknüpfung mit Rabatt-Aktionen** (eine Marke trägt Aktionen) → PROJ-5. PROJ-4 verwaltet nur die Marken-Stammdaten.
+- **Warnung beim Löschen einer Marke mit zukünftig geplanten Aktionen** → kommt mit PROJ-5, da es dort erst Aktionen gibt (hier als Anforderung vorgemerkt).
+- **Logo-/Bild-Upload je Marke** → PROJ-10 (Logo-Uploads).
+- **Kalender-/Timeline-Darstellung der Marken** und die Filterung nach Produktgruppe/Marke → PROJ-6 (Jahreskalender).
+- **Harte Farb-Eindeutigkeit / kuratierte Farbpalette** — bewusst verworfen, weil deutlich mehr als 20 Marken erwartet werden und sich mehr als ~20 Farben im Kalender ohnehin kaum unterscheiden lassen. Stattdessen freier Hex-Picker mit weicher Warnung (siehe Product Decisions).
+- **Suche/Filter in der Markenliste** — angesichts vieler Marken voraussichtlich bald nützlich, aber nicht MVP-kritisch; zurückgestellt (siehe Open Questions).
+- **Admin-only-Löschen / Rollen-Konzept** — bewusst nicht enthalten; alle eingeloggten Nutzer sind gleichberechtigt (konsistent mit PRD/PROJ-1, PROJ-3).
+- **Manuelle Sortierung der Markenliste** — Liste wird automatisch sortiert (nach Produktgruppe, dann Name); eigene Reihenfolge nicht im MVP.
+
+## Acceptance Criteria
+
+**Format:** Angenommen [Vorbedingung] / Wenn [Aktion] / Dann [Ergebnis]
+
+### Anzeigen & Leerzustand
+- [ ] Angenommen der Nutzer ist eingeloggt, wenn er die Marken-Verwaltung öffnet, dann sieht er eine sortierte Liste aller Marken (je Zeile: Farb-Swatch, Name, Produktgruppe) mit einem „Marke hinzufügen"-Button.
+- [ ] Angenommen es ist noch keine Marke angelegt, aber mindestens eine Produktgruppe existiert, wenn der Nutzer die Marken-Verwaltung öffnet, dann sieht er einen Leerzustand-Hinweis („Noch keine Marken angelegt …") und einen „Marke hinzufügen"-Button.
+- [ ] Angenommen es existiert noch keine Produktgruppe, wenn der Nutzer eine Marke anlegen will, dann sieht er einen Hinweis („Lege zuerst eine Produktgruppe an") mit Link zur Produktgruppen-Verwaltung, und das Anlegen einer Marke ist nicht möglich.
+- [ ] Angenommen der Nutzer ist **nicht** eingeloggt, wenn er die Marken-Verwaltung aufruft, dann wird er zur Login-Seite weitergeleitet.
+
+### Anlegen
+- [ ] Angenommen mindestens eine Produktgruppe existiert, wenn der Nutzer „Marke hinzufügen" wählt, einen gültigen Namen eingibt, eine Produktgruppe auswählt und speichert, dann erscheint die neue Marke in der Liste und es wird eine Erfolgsmeldung angezeigt.
+- [ ] Angenommen der Nutzer öffnet den „Marke anlegen"-Dialog, wenn der Dialog erscheint, dann ist bereits eine Vorschlags-Farbe gesetzt, die der Nutzer über einen Hex-Farbwähler ändern kann.
+- [ ] Angenommen das Namensfeld ist leer, wenn der Nutzer speichert, dann erscheint eine Validierungsmeldung und es wird keine Marke angelegt.
+- [ ] Angenommen keine Produktgruppe ausgewählt ist, wenn der Nutzer speichert, dann erscheint eine Validierungsmeldung und es wird keine Marke angelegt.
+- [ ] Angenommen eine Marke mit demselben Namen existiert **bereits in derselben Produktgruppe** (Groß-/Kleinschreibung und führende/abschließende Leerzeichen ignoriert), wenn der Nutzer speichert, dann erscheint eine Hinweismeldung („Marke existiert bereits in dieser Gruppe") und es wird kein Duplikat angelegt.
+- [ ] Angenommen derselbe Name existiert bereits in einer **anderen** Produktgruppe, wenn der Nutzer speichert, dann wird die Marke normal angelegt (gruppenweite Eindeutigkeit, keine globale).
+- [ ] Angenommen der Name ist länger als 60 Zeichen, wenn der Nutzer speichert, dann erscheint eine Validierungsmeldung und es wird keine Marke angelegt.
+- [ ] Angenommen die gewählte Farbe wird exakt bereits von einer anderen Marke verwendet, wenn der Nutzer speichert, dann erscheint ein Hinweis („Farbe wird bereits von Marke X genutzt"), das Speichern ist aber nach Bestätigung möglich (keine Blockade).
+
+### Bearbeiten
+- [ ] Angenommen eine Marke existiert, wenn der Nutzer sie bearbeitet (Name, Farbe und/oder Produktgruppe ändert) und gültige Werte speichert, dann werden die Änderungen in der Liste übernommen und eine Erfolgsmeldung angezeigt.
+- [ ] Angenommen der Nutzer ändert beim Bearbeiten die Produktgruppe, wenn in der Zielgruppe bereits eine Marke mit demselben Namen existiert, dann erscheint die Duplikat-Hinweismeldung und es wird nichts geändert.
+- [ ] Angenommen der neue Name ist leer, ein gruppeninternes Duplikat oder zu lang, wenn der Nutzer speichert, dann gelten dieselben Validierungsregeln wie beim Anlegen und es wird nichts geändert.
+
+### Löschen
+- [ ] Angenommen eine Marke existiert, wenn der Nutzer „Löschen" wählt, dann erscheint zuerst ein Bestätigungsdialog (mit Markenname), bevor die Marke entfernt wird.
+- [ ] Angenommen der Bestätigungsdialog ist offen, wenn der Nutzer bestätigt, dann wird die Marke aus der Liste entfernt und eine Erfolgsmeldung angezeigt.
+- [ ] Angenommen der Bestätigungsdialog ist offen, wenn der Nutzer abbricht, dann bleibt die Marke unverändert bestehen.
+
+### Speichern & Audit
+- [ ] Angenommen eine Marke wird angelegt oder geändert, wenn die Operation gespeichert wird, dann werden die Audit-Spalten (`created_by`/`created_at` bzw. `updated_by`/`updated_at`) automatisch serverseitig gesetzt.
+- [ ] Angenommen das Speichern schlägt fehl (z.B. Verbindungsfehler), wenn der Nutzer speichert, dann erscheint eine Fehlermeldung und die Eingabe bleibt erhalten.
+
+## Edge Cases
+- **Leerer / nur-Leerzeichen-Name** → Validierungsmeldung, keine Marke angelegt (Name wird vor der Prüfung getrimmt).
+- **Keine Produktgruppe ausgewählt** → Validierungsmeldung (Pflichtfeld).
+- **Noch gar keine Produktgruppe vorhanden** → Marken-Anlegen gesperrt, Hinweis + Link zur Produktgruppen-Verwaltung (PROJ-11).
+- **Duplikat innerhalb derselben Gruppe (case-insensitive, getrimmt)** → „Protein X", „protein x", „ Protein X " gelten in derselben Gruppe als dieselbe Marke; Anlegen/Bearbeiten wird abgelehnt. In einer anderen Gruppe ist der Name zulässig.
+- **Name zu lang (> 60 Zeichen)** → Validierungsmeldung.
+- **Exakt gleiche Farbe wie eine andere Marke** → weicher Hinweis, Speichern nach Bestätigung möglich (nie blockiert).
+- **Produktgruppe beim Bearbeiten wechseln und dadurch Namens-Kollision in der Zielgruppe** → Duplikat-Hinweis, keine Änderung.
+- **Gleichzeitiges Bearbeiten:** Zwei Nutzer ändern dieselbe Marke → der zuletzt gespeicherte Stand gewinnt (Last-Write-Wins); kein Sperrmechanismus im MVP.
+- **Marke wird gelöscht, während ein anderer Nutzer sie gerade bearbeitet** → beim Speichern erscheint ein Hinweis, dass die Marke nicht mehr existiert; die Liste wird aktualisiert.
+- **Zugeordnete Produktgruppe wird (in PROJ-11) gelöscht, während Marken darauf verweisen** → Verhalten wird in PROJ-11 final entschieden (z.B. Löschen blockieren, solange Marken zugeordnet sind); aus Sicht von PROJ-4 hier nur vorgemerkt.
+- **Netzwerk-/Serverfehler beim Speichern oder Löschen** → Fehlermeldung, der ursprüngliche Zustand bleibt erhalten.
+- **Löschen einer Marke mit zukünftig geplanten Aktionen** → in PROJ-4 nicht relevant (noch keine Aktionen); ab PROJ-5 muss vor dem Löschen gewarnt werden (siehe Out of Scope).
+
+## Technical Requirements
+- Security: Zugriff nur für eingeloggte Nutzer; RLS nach PROJ-1-Konvention (anon → kein Zugriff; authenticated → Lesen/Schreiben/Löschen).
+- Security: Geschützte Seite serverseitig absichern (nicht nur clientseitig ausblenden), analog PROJ-2/PROJ-3.
+- Daten: Audit-Spalten (`created_by`, `created_at`, `updated_by`, `updated_at`) gemäß PROJ-1-Konvention, serverseitig automatisch gesetzt.
+- Daten: Eindeutigkeit der Marke pro Produktgruppe (case-insensitive, getrimmt) zusätzlich auf DB-Ebene erzwingen (letzte Sicherung gegen gleichzeitiges Anlegen).
+- Daten: Farbe als gültiger Hex-Wert speichern (z.B. `#RRGGBB`); Validierung im Formular und auf DB-Ebene (Check-Constraint).
+- UX: Speicher-/Löschaktionen mit Ladezustand; Rückmeldungen via Toast (sonner, bereits vorhanden).
+- UI: shadcn/ui-Komponenten wiederverwenden (Card, Table, Input, Label, Button, Dialog, AlertDialog, Form, Select) — keine Eigenbauten. Für den Hex-Farbwähler nativen `<input type="color">` bzw. eine leichtgewichtige Lösung nutzen (Architektur-Entscheidung in `/architecture`).
+
+## Open Questions
+<!-- Unresolved questions from the spec interview. Close them in /refine when answered. -->
+- [ ] **Suche/Filter in der Markenliste:** Bei vielen Marken (deutlich > 20) wird eine Suche oder ein Gruppen-Filter in der Verwaltungsliste vermutlich schnell nützlich. Im MVP zurückgestellt — soll es als eigenes kleines Folge-Feature aufgenommen werden?
+- [ ] **Löschen einer Produktgruppe mit zugeordneten Marken:** Genaues Verhalten (blockieren vs. Marken verschieben) wird in PROJ-11 entschieden; betrifft PROJ-4 nur indirekt.
+- [ ] **Warnung bei Löschung einer Marke mit Aktionen:** Genaues Verhalten (blockieren vs. nur warnen) wird in PROJ-5 final entschieden, sobald Aktionen mit Marken verknüpft sind.
+
+## Decision Log
+<!-- Record of conscious decisions made and why. Added to by /write-spec and /architecture. -->
+
+### Product Decisions
+<!-- Added by /write-spec -->
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| Produktgruppen werden ein eigenes Feature (PROJ-11), nicht Teil von PROJ-4 | Eigenständige CRUD-Entität (anlegen/umbenennen/löschen wie Kanäle); unabhängig testbar/deploybar → Single Responsibility | 2026-06-25 |
+| Jede Marke wird genau einer Produktgruppe zugeordnet (Pflichtfeld) | Der Jahreskalender (PROJ-6) filtert nach Produktgruppe; ohne Zuordnung wäre eine Marke nicht filterbar | 2026-06-25 |
+| Bei leerer Produktgruppen-Liste ist Marken-Anlegen gesperrt (Hinweis + Link) | Verhindert verwaiste Marken ohne Gruppe; führt den Nutzer zur korrekten Reihenfolge (erst Gruppe, dann Marke) | 2026-06-25 |
+| Freier Hex-Farbwähler statt kuratierter Palette | Es werden deutlich mehr als 20 Marken erwartet; eine endliche Palette mit harter Eindeutigkeit würde das Anlegen blockieren, und > ~20 Farben sind ohnehin kaum unterscheidbar | 2026-06-25 |
+| Vorschlags-Farbe beim Anlegen vorbelegt | Nutzer muss nicht zwingend selbst eine Farbe wählen; schnelleres Anlegen, trotzdem änderbar | 2026-06-25 |
+| Weiche Warnung bei exakt gleicher Farbe (nie blockierend) | Konsistent mit der App-Philosophie „warnen, nicht blockieren"; hilft, unnötige Farb-Kollisionen zu vermeiden, ohne das Anlegen zu verhindern | 2026-06-25 |
+| Markenname eindeutig **pro Produktgruppe** (case-insensitive, getrimmt), nicht global | Gewünschte Flexibilität: gleicher Name in verschiedenen Gruppen erlaubt; innerhalb einer Gruppe wären Dubletten verwirrend | 2026-06-25 |
+| Voller CRUD: Anlegen, Bearbeiten (inkl. Gruppen-Wechsel), Löschen | Bearbeiten vermeidet Löschen+Neuanlegen; Löschen hält die Liste sauber | 2026-06-25 |
+| Löschen mit Bestätigungsdialog | Schutz vor versehentlichem Entfernen, analog PROJ-3 | 2026-06-25 |
+| Max. Namenslänge 60 Zeichen | Verhindert Layout-Probleme in der späteren Timeline-Ansicht (PROJ-6); konsistent mit PROJ-3 | 2026-06-25 |
+| Löschen/Bearbeiten für alle eingeloggten Nutzer (kein Rollen-Konzept) | Konsistent mit PRD/PROJ-1 „alle gleichberechtigt im MVP" | 2026-06-25 |
+| Automatische Sortierung (Produktgruppe, dann Name), keine manuelle Reihenfolge | Einfach und vorhersehbar; manuelles Sortieren nicht MVP-relevant | 2026-06-25 |
+
+### Technical Decisions
+<!-- Added by /architecture -->
+| Decision | Rationale | Date |
+|----------|-----------|------|
+| _To be added by /architecture_ | | |
+
+---
+<!-- Sections below are added by subsequent skills -->
+
+## Tech Design (Solution Architect)
+_To be added by /architecture_
+
+## QA Test Results
+_To be added by /qa_
+
+## Deployment
+_To be added by /deploy_

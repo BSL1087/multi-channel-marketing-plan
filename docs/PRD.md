@@ -12,8 +12,9 @@ Marketing-Teams (mehrere gleichberechtigte Nutzer), die parallel auf mehreren Ma
 |-----------|---------|--------|
 | P0 (MVP) | Supabase-Infrastruktur (DB, Auth, Schema) | Planned |
 | P0 (MVP) | Login / Team-Zugang | Planned |
-| P0 (MVP) | Marketplaces & Webshops verwalten | Roadmap |
-| P0 (MVP) | Marken verwalten (mit individueller Farbe) | Roadmap |
+| P0 (MVP) | Marketplaces & Webshops verwalten | Planned |
+| P0 (MVP) | Produktgruppen verwalten | Planned |
+| P0 (MVP) | Marken verwalten (mit individueller Farbe) | Planned |
 | P0 (MVP) | Rabatt-Aktionen anlegen & bearbeiten | Roadmap |
 | P0 (MVP) | Jahreskalender-Übersicht | Roadmap |
 | P0 (MVP) | Kannibalisierungs-Warnung | Roadmap |
@@ -42,9 +43,12 @@ Marketing-Teams (mehrere gleichberechtigte Nutzer), die parallel auf mehreren Ma
 
 ## Datenmodell (Übersicht)
 - **Marketplaces** (Name) — Marketplaces & eigene Webshops
-- **Marken** (Name + individuelle Farbe)
+- **Produktgruppen** (Name, z.B. „Fitness", „Familie") — eigene **verwaltbare Liste** (anleg-/umbenenn-/löschbar wie die Kanäle), gestartet mit Fitness + Familie; zur Gruppierung/Filterung der Marken
+- **Marken** (Name + individuelle Farbe + Zuordnung zu einer Produktgruppe)
 - **Rabatt-Aktionen** (Titel, Marketplace, Marke, Startdatum, Enddatum, Rabattwert [Freitext], Kommentar [optional], erstellt von)
 - **Nutzer** (Supabase Auth)
 - **Aktivitätsprotokoll** (wer hat wann was geändert)
+
+> **Hinweis (Entscheidung 2026-06-24):** Der Jahreskalender (PROJ-6) wird nach **Produktgruppe/Marke** filterbar, damit z.B. das Fitness-Team nur seine Aktionen sieht. Deshalb erhält jede Marke eine Produktgruppe (PROJ-4). Ein Plattform-Typ am Kanal (Marketplace/Webshop) wurde dafür bewusst zurückgestellt.
 
 Use `/write-spec` to create detailed feature specifications for each item in the roadmap above.
