@@ -175,8 +175,60 @@ Keine neuen. Wiederverwendet: shadcn/ui (Tooltip, Button, Card, Dialog/AlertDial
 
 **Kein Backend nötig:** Daten stammen aus PROJ-3/4/5; keine neue Tabelle, keine neuen Pakete.
 
+## Implementation Notes — Finaler Render-Stand (nach Review-Iterationen)
+**Stand:** 2026-06-26
+
+Nach mehreren Abstimmungsrunden mit dem Nutzer wurde die Darstellung wie folgt festgelegt (`src/lib/calendar-layout.ts` + `src/components/calendar-view.tsx`):
+- **Achse:** tagesgenaues Modell (Referenz: 1 Tag = 2 px, Monat = 64 px), als **Prozent** ausgegeben → füllt die volle Breite und skaliert mit dem Fenster. Monatsspalten gleich breit, Tage darin **zentriert**.
+- **Balken:** durchgehend links→rechts, **unbeschriftet**, **8 px** hoch, tagesgenaue Breite, Markenfarbe; Klick → Bearbeiten-Dialog (PROJ-5), Hover → Tooltip (Titel, Marke·Kanal, Zeitraum, Rabatt, Kommentar).
+- **Stapeln:** Überschneidungen kompakt in Unterspuren; **gleiche Marke bevorzugt gleiche Spur** (z. B. mehrere RPM-Aktionen auf einer Höhe).
+- **Zeilenhöhe:** Standard **40 px** (fasst bis zu 3 parallele Aktionen); ab der 4. parallelen Aktion **+16 px** je Spur.
+- **Legende** unter dem Kalender, **nach Produktgruppe gruppiert** (Gruppenname vorne, z. B. „Fitness", „Familie"); zeigt die im Jahr vorkommenden Marken.
+- **Jahresnavigation** über `?year=` (Vor/Zurück), Start im laufenden Jahr.
+
+**Offene/abgegrenzte Punkte:**
+- **Löschen** ist im Kalender nicht enthalten (Klick = Bearbeiten); Löschen über die Aktions-Liste (`/aktionen`).
+- **Monats-Detailansicht** (Klick auf einen Monat oben in der Achse) → **PROJ-8**. Nutzer-Entscheidung: **keine** separate Tagesansicht nötig, die Monatsansicht reicht.
+
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-06-26
+**Tester:** QA Engineer (AI) + manuelle Bestätigung durch Nutzer (mehrere Iterationen)
+**Methoden:** Build/TypeScript, HTTP-Route-Schutz, Code-Review, iterativer manueller Browser-Test.
+
+### Acceptance Criteria Status
+- [x] Matrix: Kanäle als Zeilen, 12 Monate horizontal (manuell bestätigt)
+- [x] Aktion als farbiger Balken in der Kanal-Zeile, positioniert/breit nach Zeitraum (bestätigt)
+- [x] Überschneidungen werden gestapelt (kompakt; gleiche Marke gleiche Spur) (bestätigt)
+- [x] Jahresübergreifende Aktion anteilig im Jahr (Code-Review: Clipping in `barGeometry`)
+- [~] Markenname auf dem Balken → **bewusst entfernt** zugunsten unbeschrifteter Balken + gruppierter Legende (Nutzer-Entscheidung)
+- [x] Hover → Tooltip mit Details (bestätigt)
+- [x] Klick → Bearbeiten-Dialog (bestätigt)
+- [x] „Aktion hinzufügen" legt an, erscheint im Kalender (Code-Review + onSuccess→refresh)
+- [x] Jahr vor/zurück lädt das gewählte Jahr (Code-Review: `?year=`)
+- [x] Keine Kanäle → Hinweis + Link (Code-Review)
+- [x] Kanäle aber keine Aktion → Hinweis (Code-Review)
+- [x] Nicht eingeloggt → /login (HTTP 307 verifiziert)
+
+### Security Audit Results
+- [x] Route-Schutz serverseitig: Kalender → HTTP 307 → /login (auch mit `?year=`)
+- [x] Daten serverseitig mit RLS geladen (eingeloggte Sitzung); keine neuen DB-Objekte
+- [x] Keine Secrets im Client; keine neuen Pakete
+
+### Automatisierte Tests
+- **Build/TypeScript:** `next build` + `tsc --noEmit` fehlerfrei.
+- **E2E (Playwright):** `tests/PROJ-6-jahreskalender.spec.ts` (Route-Schutz) geschrieben; lokal nicht ausführbar (Umgebung), für CI vorgesehen.
+- Reine Layout-Logik (`calendar-layout.ts`) ist gut für Unit-Tests geeignet — als Folge-Aufgabe vermerkt (Geometrie/Stapeln).
+
+### Bugs Found
+- **Keine offenen.** Mehrere Darstellungs-Anpassungen wurden während des Reviews iterativ umgesetzt (Balkenhöhe, Stapeln, Zeilenhöhe, gruppierte Legende).
+
+### Summary
+- **Acceptance Criteria:** erfüllt (1 bewusst geändert: Balken unbeschriftet statt mit Name)
+- **Bugs:** 0
+- **Security:** Pass
+- **Production Ready:** YES
+- **Recommendation:** PROJ-6 freigeben. Nächstes: PROJ-8 Monats-Detailansicht (Einstieg per Klick auf den Monat; keine Tagesansicht). Filter (inkl. Marketplace/Webshop-Typ) als weiteres Folge-Feature.
 
 ## Deployment
 _To be added by /deploy_

@@ -1,13 +1,29 @@
 /**
  * Pure layout helpers for the year calendar (PROJ-6).
- * Bars are positioned by their day-of-year fraction so widths stay proportional
- * and cross-year actions are clipped to the displayed year.
+ *
+ * Fixed, day-accurate pixel axis:
+ *  - One day = DAY_WIDTH px.
+ *  - Every month column has the same width MONTH_WIDTH px. A month's days
+ *    (daysInMonth × DAY_WIDTH) are centered inside the column; the leftover
+ *    pixels are split evenly left and right.
+ *  - Bars are day-accurate: their width follows the action's date range.
+ *
+ * Overlap handling: every action is ONE continuous left-to-right bar. When
+ * actions in the same channel overlap in time, the later one stacks compactly
+ * onto a sub-lane below.
  */
 
 const MONTH_LABELS = [
   "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
 ];
+
+/** Pixels per day. */
+export const DAY_WIDTH = 2;
+/** Uniform width of one month column, in pixels (days are centered within). */
+export const MONTH_WIDTH = 64;
+/** Total width of the 12-month track, in pixels. */
+export const TRACK_WIDTH = MONTH_WIDTH * 12;
 
 export type CalendarItem = {
   id: string;
@@ -17,9 +33,9 @@ export type CalendarItem = {
 
 export type LaidOutItem<T> = {
   item: T;
-  leftPct: number;
-  widthPct: number;
-  lane: number;
+  leftPx: number;
+  widthPx: number;
+  lane: number; // sub-lane index within the channel row (0 = top)
 };
 
 export type ChannelLayout<T> = {
@@ -27,82 +43,120 @@ export type ChannelLayout<T> = {
   items: LaidOutItem<T>[];
 };
 
-function utcDays(year: number): number {
-  return (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / 86_400_000;
+function daysInMonth(year: number, monthIndex: number): number {
+  return (
+    (Date.UTC(year, monthIndex + 1, 1) - Date.UTC(year, monthIndex, 1)) /
+    86_400_000
+  );
 }
 
-/** 0-based day index within `year` (Jan 1 = 0). Can be negative or beyond the year. */
+/** Left padding that centers a month's days within its fixed column. */
+function monthPad(year: number, monthIndex: number): number {
+  return (MONTH_WIDTH - daysInMonth(year, monthIndex) * DAY_WIDTH) / 2;
+}
+
+/** 0-based day index within `year` (Jan 1 = 0) — used for overlap detection. */
 function dayIndex(iso: string, year: number): number {
   const [y, m, d] = iso.split("-").map(Number);
   return (Date.UTC(y, m - 1, d) - Date.UTC(year, 0, 1)) / 86_400_000;
 }
 
+/** Clamp a date to the displayed year, returning its month index + day. */
+function clampToYear(iso: string, year: number): { m: number; d: number } {
+  const [y, mo, da] = iso.split("-").map(Number);
+  const t = Date.UTC(y, mo - 1, da);
+  if (t < Date.UTC(year, 0, 1)) return { m: 0, d: 1 };
+  if (t > Date.UTC(year, 11, 31)) return { m: 11, d: 31 };
+  return { m: mo - 1, d: da };
+}
+
+/** Pixel x of the LEFT edge of a given day (centered month grid). */
+function dayLeftPx(year: number, m: number, d: number): number {
+  return m * MONTH_WIDTH + monthPad(year, m) + (d - 1) * DAY_WIDTH;
+}
+
 /**
- * Bar geometry (percent of the year) for an action, clipped to `year`.
+ * Day-accurate bar geometry in pixels, clipped to `year`.
  * Returns null when the action does not overlap the year at all.
  */
 export function barGeometry(
   item: CalendarItem,
   year: number,
-): { leftPct: number; widthPct: number; startIdx: number; endIdx: number } | null {
-  const days = utcDays(year);
-  const rawStart = dayIndex(item.start_date, year);
-  const rawEnd = dayIndex(item.end_date, year);
-  if (rawEnd < 0 || rawStart > days - 1) return null; // outside the year
+): { leftPx: number; widthPx: number; startIdx: number; endIdx: number } | null {
+  const [sy, sm, sd] = item.start_date.split("-").map(Number);
+  const [ey, em, ed] = item.end_date.split("-").map(Number);
+  const startT = Date.UTC(sy, sm - 1, sd);
+  const endT = Date.UTC(ey, em - 1, ed);
+  if (endT < Date.UTC(year, 0, 1) || startT > Date.UTC(year, 11, 31)) {
+    return null;
+  }
 
-  const startIdx = Math.max(rawStart, 0);
-  const endIdx = Math.min(rawEnd, days - 1);
-  const leftPct = (startIdx / days) * 100;
-  const widthPct = ((endIdx - startIdx + 1) / days) * 100;
-  return { leftPct, widthPct, startIdx, endIdx };
+  const s = clampToYear(item.start_date, year);
+  const e = clampToYear(item.end_date, year);
+  const leftPx = dayLeftPx(year, s.m, s.d);
+  const rightPx = dayLeftPx(year, e.m, e.d) + DAY_WIDTH; // include the end day
+  const days = daysInYear(year);
+  return {
+    leftPx,
+    widthPx: Math.max(rightPx - leftPx, DAY_WIDTH),
+    startIdx: Math.max(dayIndex(item.start_date, year), 0),
+    endIdx: Math.min(dayIndex(item.end_date, year), days - 1),
+  };
+}
+
+function daysInYear(year: number): number {
+  return (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / 86_400_000;
 }
 
 /**
- * Lays out one channel's actions: assigns each a lane via greedy interval
- * partitioning (sorted by start) so overlapping bars never collide.
+ * Lays out one channel's actions as continuous bars, assigning each a sub-lane
+ * via greedy interval partitioning (sorted by start) so overlapping bars stack.
+ *
+ * `getGroup` (e.g. the brand id) lets the same group prefer the same lane: among
+ * free lanes, one that last held the same group is reused first, so a brand's
+ * non-overlapping actions line up on one horizontal track.
  */
 export function layoutChannel<T extends CalendarItem>(
   items: T[],
   year: number,
+  getGroup?: (item: T) => string,
 ): ChannelLayout<T> {
   const geo = items
     .map((item) => ({ item, g: barGeometry(item, year) }))
     .filter((x): x is { item: T; g: NonNullable<ReturnType<typeof barGeometry>> } => x.g !== null)
     .sort((a, b) => a.g.startIdx - b.g.startIdx || a.g.endIdx - b.g.endIdx);
 
-  const laneEnds: number[] = []; // last endIdx per lane
+  const lanes: { end: number; group?: string }[] = [];
   const result: LaidOutItem<T>[] = [];
 
   for (const { item, g } of geo) {
-    let lane = laneEnds.findIndex((end) => end < g.startIdx);
+    const group = getGroup?.(item);
+    // Prefer a free lane that last held the same group, then any free lane.
+    let lane =
+      group !== undefined
+        ? lanes.findIndex((l) => l.end < g.startIdx && l.group === group)
+        : -1;
+    if (lane === -1) lane = lanes.findIndex((l) => l.end < g.startIdx);
+
     if (lane === -1) {
-      lane = laneEnds.length;
-      laneEnds.push(g.endIdx);
+      lane = lanes.length;
+      lanes.push({ end: g.endIdx, group });
     } else {
-      laneEnds[lane] = g.endIdx;
+      lanes[lane] = { end: g.endIdx, group };
     }
-    result.push({ item, leftPct: g.leftPct, widthPct: g.widthPct, lane });
+    result.push({ item, leftPx: g.leftPx, widthPx: g.widthPx, lane });
   }
 
-  return { lanes: Math.max(laneEnds.length, 1), items: result };
+  return { lanes: Math.max(lanes.length, 1), items: result };
 }
 
-/** Proportional month columns for the axis (label + position + width in %). */
-export function monthColumns(
-  year: number,
-): { label: string; leftPct: number; widthPct: number }[] {
-  const days = utcDays(year);
-  const cols: { label: string; leftPct: number; widthPct: number }[] = [];
-  for (let m = 0; m < 12; m++) {
-    const start = (Date.UTC(year, m, 1) - Date.UTC(year, 0, 1)) / 86_400_000;
-    const len = (Date.UTC(year, m + 1, 1) - Date.UTC(year, m, 1)) / 86_400_000;
-    cols.push({
-      label: MONTH_LABELS[m],
-      leftPct: (start / days) * 100,
-      widthPct: (len / days) * 100,
-    });
-  }
-  return cols;
+/** Fixed-width month columns for the axis (label + pixel position + width). */
+export function monthColumns(): { label: string; leftPx: number; widthPx: number }[] {
+  return MONTH_LABELS.map((label, m) => ({
+    label,
+    leftPx: m * MONTH_WIDTH,
+    widthPx: MONTH_WIDTH,
+  }));
 }
 
 /** True when a hex colour is light enough to need dark text on top. */

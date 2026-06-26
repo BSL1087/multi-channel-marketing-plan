@@ -9,8 +9,8 @@ import type { DiscountAction } from "@/app/tools/multi-channel-marketing/aktione
 import {
   layoutChannel,
   monthColumns,
-  isLightColor,
   formatDate,
+  TRACK_WIDTH,
 } from "@/lib/calendar-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,9 +22,30 @@ import {
 import { ActionFormDialog } from "@/components/action-form-dialog";
 
 type Option = { id: string; name: string };
+type BrandOption = {
+  id: string;
+  name: string;
+  color: string;
+  product_group_name: string;
+};
 
-const LANE_HEIGHT = 30; // px per stacked sub-lane (bar + gap)
+const BAR_HEIGHT = 8; // px — unlabeled day-accurate colour bar
+const ROW_BASE = 40; // px — default row height; holds up to BASE_LANES bars
+const BASE_LANES = 3; // up to 3 parallel actions fit within ROW_BASE
+const LANE_EXTRA = 16; // px added per lane beyond BASE_LANES
 const LABEL_WIDTH = "11rem";
+
+/** Channel row height: 40px for up to 3 lanes, then +16px per extra lane. */
+function rowHeight(lanes: number): number {
+  return lanes <= BASE_LANES
+    ? ROW_BASE
+    : ROW_BASE + (lanes - BASE_LANES) * LANE_EXTRA;
+}
+
+/** Reference-frame pixels (768px track) → percent, so the axis fills any width. */
+function pct(px: number): string {
+  return `${(px / TRACK_WIDTH) * 100}%`;
+}
 
 export function CalendarView({
   year,
@@ -35,13 +56,31 @@ export function CalendarView({
   year: number;
   channels: Option[];
   actions: DiscountAction[];
-  brands: Option[];
+  brands: BrandOption[];
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<DiscountAction | null>(null);
 
-  const months = useMemo(() => monthColumns(year), [year]);
+  const months = useMemo(() => monthColumns(), []);
+
+  // Colour legend: brands that appear in the displayed year, grouped by product group.
+  const legend = useMemo(() => {
+    const present = new Set(actions.map((a) => a.brand_id));
+    const groups = new Map<string, BrandOption[]>();
+    for (const b of brands) {
+      if (!present.has(b.id)) continue;
+      const arr = groups.get(b.product_group_name) ?? [];
+      arr.push(b);
+      groups.set(b.product_group_name, arr);
+    }
+    return [...groups.entries()]
+      .map(([group, items]) => ({
+        group,
+        items: items.sort((a, b) => a.name.localeCompare(b.name, "de")),
+      }))
+      .sort((a, b) => a.group.localeCompare(b.group, "de"));
+  }, [actions, brands]);
 
   // Group actions by channel, then lay each channel out into stacked lanes.
   const byChannel = useMemo(() => {
@@ -53,7 +92,7 @@ export function CalendarView({
     }
     return channels.map((c) => ({
       channel: c,
-      layout: layoutChannel(map.get(c.id) ?? [], year),
+      layout: layoutChannel(map.get(c.id) ?? [], year, (a) => a.brand_id),
     }));
   }, [actions, channels, year]);
 
@@ -67,7 +106,6 @@ export function CalendarView({
   }
   const refresh = () => router.refresh();
 
-  // No channels → the matrix has no rows; guide the user.
   if (channels.length === 0) {
     return (
       <div className="mt-6 flex flex-col items-center rounded-lg border border-dashed bg-background px-6 py-16 text-center">
@@ -138,7 +176,7 @@ export function CalendarView({
                 <div
                   key={m.label}
                   className="absolute top-0 flex h-full items-center justify-center border-l text-xs text-muted-foreground"
-                  style={{ left: `${m.leftPct}%`, width: `${m.widthPct}%` }}
+                  style={{ left: pct(m.leftPx), width: pct(m.widthPx) }}
                 >
                   {m.label}
                 </div>
@@ -147,76 +185,101 @@ export function CalendarView({
           </div>
 
           {/* Channel rows */}
-          {byChannel.map(({ channel, layout }) => (
+          {byChannel.map(({ channel, layout }) => {
+            const rowH = rowHeight(layout.lanes);
+            const slot = rowH / layout.lanes;
+            return (
             <div key={channel.id} className="flex border-b last:border-b-0">
               <div
-                className="shrink-0 border-r px-3 py-2 text-sm font-medium"
+                className="flex shrink-0 items-center border-r px-3 text-sm font-medium"
                 style={{ width: LABEL_WIDTH }}
               >
                 {channel.name}
               </div>
-              <div
-                className="relative flex-1"
-                style={{ height: layout.lanes * LANE_HEIGHT + 8 }}
-              >
+              <div className="relative flex-1" style={{ height: rowH }}>
                 {/* Month gridlines */}
                 {months.map((m) => (
                   <div
                     key={m.label}
                     className="absolute top-0 h-full border-l border-border/60"
-                    style={{ left: `${m.leftPct}%` }}
+                    style={{ left: pct(m.leftPx) }}
                   />
                 ))}
 
-                {/* Action bars */}
-                {layout.items.map(({ item, leftPct, widthPct, lane }) => {
-                  const light = isLightColor(item.brand_color);
-                  return (
-                    <TooltipProvider key={item.id} delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(item)}
-                            className="absolute flex items-center overflow-hidden rounded px-1.5 text-xs font-medium shadow-sm ring-1 ring-black/10 transition-[filter] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            style={{
-                              left: `${leftPct}%`,
-                              width: `${widthPct}%`,
-                              minWidth: "0.5rem",
-                              top: lane * LANE_HEIGHT + 4,
-                              height: LANE_HEIGHT - 8,
-                              backgroundColor: item.brand_color,
-                              color: light ? "#1a1a1a" : "#ffffff",
-                            }}
-                          >
-                            <span className="truncate">{item.brand_name}</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p className="font-semibold">{item.title}</p>
-                          <p className="text-xs">
-                            {item.brand_name} · {item.marketplace_name}
+                {/* Day-accurate action bars (stacked on overlap) */}
+                {layout.items.map(({ item, leftPx, widthPx, lane }) => (
+                  <TooltipProvider key={item.id} delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(item)}
+                          aria-label={`${item.title} (${item.brand_name})`}
+                          className="absolute rounded-[2px] ring-1 ring-black/10 transition-[filter] hover:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          style={{
+                            left: pct(leftPx),
+                            width: pct(widthPx),
+                            minWidth: 2,
+                            top: lane * slot + (slot - BAR_HEIGHT) / 2,
+                            height: BAR_HEIGHT,
+                            backgroundColor: item.brand_color,
+                          }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="font-semibold">{item.title}</p>
+                        <p className="text-xs">
+                          {item.brand_name} · {item.marketplace_name}
+                        </p>
+                        <p className="text-xs">
+                          {formatDate(item.start_date)} –{" "}
+                          {formatDate(item.end_date)}
+                        </p>
+                        <p className="text-xs">Rabatt: {item.discount_value}</p>
+                        {item.comment && (
+                          <p className="mt-1 text-xs italic text-muted-foreground">
+                            {item.comment}
                           </p>
-                          <p className="text-xs">
-                            {formatDate(item.start_date)} –{" "}
-                            {formatDate(item.end_date)}
-                          </p>
-                          <p className="text-xs">Rabatt: {item.discount_value}</p>
-                          {item.comment && (
-                            <p className="mt-1 text-xs italic text-muted-foreground">
-                              {item.comment}
-                            </p>
-                          )}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  );
-                })}
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ))}
               </div>
+            </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Colour legend, grouped by product group */}
+      {legend.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1.5">
+          {legend.map((g) => (
+            <div
+              key={g.group}
+              className="flex flex-wrap items-center gap-x-4 gap-y-1.5"
+            >
+              <span className="w-20 shrink-0 text-xs font-semibold text-muted-foreground">
+                {g.group}
+              </span>
+              {g.items.map((b) => (
+                <span
+                  key={b.id}
+                  className="inline-flex items-center gap-1.5 text-xs"
+                >
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-[2px] border"
+                    style={{ backgroundColor: b.color }}
+                    aria-hidden
+                  />
+                  {b.name}
+                </span>
+              ))}
             </div>
           ))}
         </div>
-      </div>
+      )}
 
       <ActionFormDialog
         open={formOpen}

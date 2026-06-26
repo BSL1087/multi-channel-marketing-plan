@@ -20,6 +20,20 @@ type ActionRow = {
   brands: { name: string; color: string } | { name: string; color: string }[] | null;
 };
 
+type BrandRow = {
+  id: string;
+  name: string;
+  color: string;
+  product_groups: { name: string } | { name: string }[] | null;
+};
+
+type BrandOption = {
+  id: string;
+  name: string;
+  color: string;
+  product_group_name: string;
+};
+
 function one<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
@@ -49,7 +63,7 @@ export default async function CalendarPage({
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
 
-  const [{ data: actionRows }, { data: channels }, { data: brands }] =
+  const [{ data: actionRows }, { data: channels }, { data: brandRows }] =
     await Promise.all([
       supabase
         .from("discount_actions")
@@ -60,7 +74,11 @@ export default async function CalendarPage({
         .gte("end_date", yearStart)
         .returns<ActionRow[]>(),
       supabase.from("marketplaces").select("id, name").order("name"),
-      supabase.from("brands").select("id, name").order("name"),
+      supabase
+        .from("brands")
+        .select("id, name, color, product_groups(name)")
+        .order("name")
+        .returns<BrandRow[]>(),
     ]);
 
   const actions: DiscountAction[] = (actionRows ?? []).map((a) => {
@@ -78,6 +96,16 @@ export default async function CalendarPage({
       marketplace_name: mp?.name ?? "—",
       brand_name: br?.name ?? "—",
       brand_color: br?.color ?? "#999999",
+    };
+  });
+
+  const brands: BrandOption[] = (brandRows ?? []).map((b) => {
+    const grp = one(b.product_groups);
+    return {
+      id: b.id,
+      name: b.name,
+      color: b.color,
+      product_group_name: grp?.name ?? "Ohne Gruppe",
     };
   });
 
@@ -107,7 +135,7 @@ export default async function CalendarPage({
           year={year}
           channels={channels ?? []}
           actions={actions}
-          brands={brands ?? []}
+          brands={brands}
         />
       </main>
     </div>
