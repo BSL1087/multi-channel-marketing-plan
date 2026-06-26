@@ -183,6 +183,36 @@ Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookf
 - Keine Verknüpfung mit Aktionen (PROJ-5), kein Logo-Upload (PROJ-10), keine Kalender-Darstellung (PROJ-6).
 - Kein Rollen-/Rechtekonzept; keine harte Farb-Eindeutigkeit.
 
+## Implementation Notes (Frontend)
+**Stand:** 2026-06-26
+
+**Seite (Server Component):**
+- `src/app/tools/multi-channel-marketing/marken/page.tsx`: geschützt (Auth-Check + Redirect zu `/login`). Lädt Marken (mit Produktgruppen-Name via Join `product_groups(name)`) und die Gruppenliste parallel, mappt den Join auf `product_group_name`, übergibt an `BrandManager`. Kopfzeile mit „Zurück zum Dashboard".
+
+**Server-Aktionen:**
+- `src/app/tools/multi-channel-marketing/marken/actions.ts`: `createBrand`, `updateBrand`, `deleteBrand` („use server"). Geteilte `validate()`-Funktion (Name/Farbe/Gruppe), Duplikat-Prüfung **pro Gruppe** (App-seitig + DB-`23505`), Auth-Check je Aktion, `revalidatePath`. `updateBrand` erkennt zwischenzeitlich gelöschte Marken (leeres `update().select()`). Typen `Brand`, `BrandInput`, `BrandActionResult`, `BrandDeleteResult`.
+
+**Client-Komponenten (shadcn/ui, keine Eigenbauten):**
+- `src/components/brand-manager.tsx`: Liste (`Table` mit Farb-Swatch · Name · Gruppe · Bearbeiten · Löschen), sortiert nach Gruppe dann Name; Leerzustand A (keine Marke), **Leerzustand B (keine Gruppe → Anlegen gesperrt, Link zur Produktgruppen-Verwaltung)**.
+- `src/components/brand-form-dialog.tsx`: Anlegen **und** Bearbeiten (ein Dialog). Name, **Produktgruppen-`Select`**, **nativer `<input type="color">`** mit vorbelegter Vorschlagsfarbe (`suggestColor` meidet bereits genutzte Farben). **Weiche, live Farb-Kollisionswarnung** (nennt die kollidierende Marke; blockiert nicht). Duplikat-Fehler als Feldmeldung, sonst Toast.
+- `src/components/delete-brand-dialog.tsx`: `AlertDialog`-Bestätigung mit Markenname.
+
+**Geteilte Validierung:**
+- `src/lib/brand-validation.ts`: `brandNameSchema` (1–60, getrimmt), `brandColorSchema` (`#RRGGBB`), `productGroupIdSchema` (uuid), `isDuplicateBrandInGroup` (pro Gruppe); `isDuplicateName` aus `channel-validation` re-exportiert.
+
+**Dashboard-Einstieg:**
+- `src/app/page.tsx`: vierte Kachel „Marken verwalten" (Icon `Tag`) → `/tools/multi-channel-marketing/marken`.
+
+**Verifikation:** `tsc --noEmit` fehlerfrei; `next build` erfolgreich (Route `/tools/multi-channel-marketing/marken` dynamisch erkannt).
+
+**⚠️ Offen für `/backend`:** Tabelle `public.brands` existiert noch nicht — die Seite ist gebaut, aber zur Laufzeit erst nach der Migration funktionsfähig. `/backend` muss anlegen (Muster wie `product_groups`):
+- Tabelle `brands`: `id`, `name`, `color` (text), `product_group_id` (uuid), Audit-Spalten.
+- **Fremdschlüssel** `product_group_id` → `product_groups(id)` **ON DELETE RESTRICT** (macht die PROJ-11-Lösch-Sperre scharf).
+- **Check-Constraints:** `length(trim(name)) between 1 and 60`; `color ~ '^#[0-9A-Fa-f]{6}$'`.
+- **Unique-Index pro Gruppe**, case-insensitive/getrimmt: auf (`product_group_id`, `lower(trim(name))`) — App verlässt sich auf `23505`.
+- **Audit-Trigger** (wie `product_groups_set_audit`), RLS nach PROJ-1-Konvention (anon: kein Zugriff; authenticated: voll).
+- Optional: Unit-Tests für `brand-validation.ts` (analog `product-group-validation.test.ts`).
+
 ## QA Test Results
 _To be added by /qa_
 
