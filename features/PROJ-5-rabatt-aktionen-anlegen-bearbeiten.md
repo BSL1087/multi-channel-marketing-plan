@@ -194,6 +194,26 @@ Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookf
 - **Audit-Trigger** (wie `set_product_groups_audit`), RLS nach PROJ-1-Konvention (anon kein Zugriff; authenticated voll).
 - Optional: Unit-Tests für `action-validation.ts`.
 
+## Implementation Notes (Backend)
+**Stand:** 2026-06-26 — Supabase-Projekt „Multi-Channel-Marketing" (`grtqmrnjjsucskdeghrr`).
+
+**Datenbank (Migration `create_discount_actions_table`):** Tabelle `public.discount_actions`, Muster wie bisher.
+- Spalten: `id` (uuid PK), `title`, `marketplace_id` (uuid NOT NULL), `brand_id` (uuid NOT NULL), `start_date`/`end_date` (date), `discount_value` (text), `comment` (text, nullable), Audit-Spalten.
+- **Fremdschlüssel** `marketplace_id` → `marketplaces(id)` **ON DELETE CASCADE** und `brand_id` → `brands(id)` **ON DELETE CASCADE** → Marke/Kanal löschen entfernt deren Aktionen mit.
+- `created_by`/`updated_by` → `auth.users(id)` `ON DELETE SET NULL`.
+- Check-Constraints: Titel 1–80, Rabattwert 1–50, Kommentar ≤ 500, `end_date >= start_date`.
+- Indizes auf `marketplace_id`, `brand_id`, `start_date`.
+- **Audit-Trigger** `discount_actions_set_audit` (BEFORE INSERT/UPDATE); `EXECUTE` entzogen (nur per Trigger).
+- **RLS** aktiviert; 4 Policies für `authenticated`; `anon` → Default-Deny.
+
+**Funktionsprüfung (SQL, 7/7 bestanden):** gültiger Insert ✓; eintägig (Start=Ende) ✓; Ende<Start → `check_violation` ✓; Titel>80 → `check` ✓; Rabattwert>50 → `check` ✓; **Marke löschen → Aktionen weg (Cascade, remaining=0)** ✓; **Kanal löschen → Aktionen weg (Cascade, remaining=0)** ✓. Testdaten entfernt (`discount_actions` = 0; die 2 vorhandenen Marken sind echte Nutzer-Einträge, unangetastet).
+
+**Security-Advisors:** keine `discount_actions`-Befunde. Projektweit verbleibt nur `auth_leaked_password_protection` (manueller Auth-Schalter).
+
+**Tests:** `src/lib/action-validation.test.ts` (Vitest): 9 Tests (Feld-Schemata + `actionSchema` inkl. Ende≥Start, eintägig, UUID/Datums-Validierung). **Gesamtsuite 42/42 grün** mit `npx vitest run --pool=threads`. Keine `/api`-Routen (Server Actions + RLS), daher keine Route-Integrationstests.
+
+**Hinweis:** Migration direkt über den Supabase-MCP angewandt (die `/backend`-Slash-Skill ist im Root-Workspace nicht verfügbar; Vorgehen folgt dem dokumentierten Backend-Vertrag).
+
 ## QA Test Results
 _To be added by /qa_
 
