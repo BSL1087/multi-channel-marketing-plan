@@ -1,6 +1,6 @@
 # PROJ-5: Rabatt-Aktionen anlegen & bearbeiten
 
-## Status: Planned
+## Status: Approved
 **Created:** 2026-06-26
 **Last Updated:** 2026-06-26
 
@@ -215,7 +215,48 @@ Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookf
 **Hinweis:** Migration direkt über den Supabase-MCP angewandt (die `/backend`-Slash-Skill ist im Root-Workspace nicht verfügbar; Vorgehen folgt dem dokumentierten Backend-Vertrag).
 
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-06-26
+**Tester:** QA Engineer (AI) + manuelle Bestätigung durch Nutzer
+**Methoden:** Unit-Tests (Vitest), Build/TypeScript, HTTP-Route-Schutz, funktionale DB-Verifikation (Backend), Code-Review, manueller Browser-Smoke-Test. E2E-Spec geschrieben, lokal nicht ausführbar (Umgebung).
+
+### Acceptance Criteria Status
+- [x] Liste chronologisch (Titel, Marke+Swatch, Kanal, Zeitraum, Rabatt) + „Aktion hinzufügen" (Smoke-Test)
+- [x] Leerzustand „keine Aktion" (Code-Review)
+- [x] Leerzustand „keine Marke ODER kein Kanal" → Anlegen gesperrt + Links (Code-Review)
+- [x] Nicht eingeloggt → /login (HTTP 307)
+- [x] Anlegen mit Pflichtfeldern → erscheint + Erfolgsmeldung (Smoke-Test)
+- [x] Fehlende Pflichtfelder → Validierung (Unit-Test + Zod)
+- [x] Ende vor Start → Validierung (Smoke-Test + Unit-Test + DB-Check)
+- [x] Eintägig (Start=Ende) → akzeptiert (Unit-Test + DB-Check)
+- [x] Bearbeiten → übernommen (Smoke-Test)
+- [x] Aktion löschen → Bestätigungsdialog → entfernt (Smoke-Test)
+- [x] Marke/Kanal mit Aktionen löschen → Warnung mit Anzahl → Mitlöschen nach Bestätigung (Smoke-Test + DB-Cascade verifiziert)
+- [x] Audit-Spalten serverseitig (Backend-Trigger verifiziert)
+- [x] Speicherfehler → Fehlermeldung, Eingabe bleibt (Code-Review)
+
+### Security Audit Results
+- [x] Route-Schutz serverseitig: `/aktionen` → HTTP 307 → /login
+- [x] RLS nach PROJ-1-Konvention (anon Default-Deny, authenticated voll); 0 feature-spezifische Advisor-Befunde
+- [x] DB-Check-Constraints (Titel/Wert/Kommentar-Länge, Ende≥Start)
+- [x] FK ON DELETE CASCADE auf Marke und Kanal per SQL bestätigt (beide Pfade)
+- [x] Audit-Trigger-Funktion gehärtet (EXECUTE entzogen)
+
+### Automatisierte Tests
+- **Unit (Vitest):** 42/42 grün mit `npx vitest run --pool=threads` (davon 9 für `action-validation`).
+- **Funktionale DB-Checks:** 7/7 bestanden (siehe Backend-Notizen).
+- **E2E (Playwright):** `tests/PROJ-5-rabatt-aktionen.spec.ts` (Route-Schutz) geschrieben; lokal nicht ausführbar (Umgebung), für CI vorgesehen.
+
+### Bugs Found
+- **Keine.** (0 Critical, 0 High, 0 Medium, 0 Low)
+- **Offen (projektweit, nicht PROJ-5):** Advisor `auth_leaked_password_protection` (manueller Auth-Schalter) — Low, nicht blockierend.
+
+### Summary
+- **Acceptance Criteria:** alle verifiziert (Unit-Tests + DB-Checks + Code-Review + manueller Smoke-Test)
+- **Bugs:** 0
+- **Security:** Pass
+- **Production Ready:** YES
+- **Recommendation:** PROJ-5 freigeben. Kannibalisierungs-Warnung (vom Nutzer gewünscht) ist als **PROJ-7** eingeplant. E2E-Suite bei Gelegenheit in CI ausführen.
 
 ## Deployment
 _To be added by /deploy_
