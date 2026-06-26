@@ -213,6 +213,27 @@ Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookf
 - **Audit-Trigger** (wie `product_groups_set_audit`), RLS nach PROJ-1-Konvention (anon: kein Zugriff; authenticated: voll).
 - Optional: Unit-Tests für `brand-validation.ts` (analog `product-group-validation.test.ts`).
 
+## Implementation Notes (Backend)
+**Stand:** 2026-06-26 — Supabase-Projekt „Multi-Channel-Marketing" (`grtqmrnjjsucskdeghrr`).
+
+**Datenbank (Migration `create_brands_table`):** Tabelle `public.brands`, Muster wie `product_groups`/`marketplaces`.
+- Spalten: `id` (uuid, PK, `gen_random_uuid()`), `name` (text), `color` (text), `product_group_id` (uuid, **NOT NULL**), Audit `created_by`/`created_at`/`updated_by`/`updated_at`.
+- **Fremdschlüssel** `product_group_id` → `product_groups(id)` **ON DELETE RESTRICT** → macht die in PROJ-11 vorbereitete Lösch-Sperre scharf.
+- `created_by`/`updated_by` → `auth.users(id)` mit `ON DELETE SET NULL`.
+- Check-Constraints: `brands_name_check` (`length(trim(name)) >= 1 and length(name) <= 60`), `brands_color_check` (`color ~ '^#[0-9A-Fa-f]{6}$'`).
+- **Unique-Index pro Gruppe**, case-insensitive/getrimmt: `brands_name_per_group_unique_idx` auf (`product_group_id`, `lower(trim(name))`) → gleicher Name in anderer Gruppe erlaubt; App fängt `23505`.
+- Zusatz-Index `brands_product_group_id_idx` für FK-Lookups (PROJ-11-Lösch-Zählung, Joins).
+- **Audit-Trigger** `brands_set_audit` (BEFORE INSERT/UPDATE) via `set_brands_audit()`: setzt `created_by`/`updated_by = auth.uid()` + Zeitstempel serverseitig; `created_*` bei Updates unveränderlich; `EXECUTE` entzogen (nur per Trigger).
+- **RLS** aktiviert; 4 Policies für `authenticated` (SELECT/INSERT/UPDATE/DELETE, `auth.uid() is not null`); `anon` ohne Policy → Default-Deny.
+
+**Funktionsprüfung (SQL, 6/6 bestanden):** gültiger Insert ✓; Duplikat in gleicher Gruppe (`  qa marke `) → `unique_violation` ✓; gleicher Name in anderer Gruppe → erlaubt ✓; ungültige Farbe (`red`) → `check_violation` ✓; Name > 60 → `check_violation` ✓; **Gruppe mit Marke löschen → `foreign_key_violation` (Lösch-Sperre scharf)** ✓. Testdaten wieder entfernt (`brands` = 0).
+
+**Security-Advisors:** keine `brands`-Befunde. Projektweit verbleibt nur `auth_leaked_password_protection` (manueller Auth-Schalter, nicht feature-spezifisch).
+
+**Tests:** `src/lib/brand-validation.test.ts` (Vitest): 18 Unit-Tests (Name-, Farb-, UUID-Schema + Duplikat pro Gruppe inkl. Self-Exclude/Gruppenwechsel-Clash). **Gesamtsuite 33/33 grün** mit `npx vitest run --pool=threads`. Keine `/api`-Routen (Server Actions + RLS), daher keine Route-Integrationstests — analog PROJ-1/2/3/11.
+
+**Hinweis:** Migration direkt über den Supabase-MCP angewandt (die `/backend`-Skill war wegen Root-Workspace-Scoping nicht als Slash-Command verfügbar; Vorgehen folgt 1:1 dem dokumentierten Backend-Vertrag).
+
 ## QA Test Results
 _To be added by /qa_
 
