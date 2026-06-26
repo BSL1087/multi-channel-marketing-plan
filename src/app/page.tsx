@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarRange, ChevronRight, Store, Tag, Tags } from "lucide-react";
+import { BadgePercent, CalendarRange, ChevronRight, Store, Tag, Tags } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
@@ -138,6 +138,29 @@ export default async function DashboardPage() {
                   <h2 className="font-medium">Marken verwalten</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Marken mit Farbe und Produktgruppe für den Kalender pflegen.
+                  </p>
+                </div>
+                <span className="mt-auto inline-flex items-center text-sm font-medium text-primary">
+                  Öffnen
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link
+            href="/tools/multi-channel-marketing/aktionen"
+            className="group rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Card className="h-full transition-colors hover:border-primary/40 hover:bg-accent/50">
+              <CardContent className="flex h-full flex-col gap-3 p-5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <BadgePercent className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="font-medium">Rabatt-Aktionen</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Aktionen je Kanal und Marke mit Zeitraum und Rabattwert planen.
                   </p>
                 </div>
                 <span className="mt-auto inline-flex items-center text-sm font-medium text-primary">

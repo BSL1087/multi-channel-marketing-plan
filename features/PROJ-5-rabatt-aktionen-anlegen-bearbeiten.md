@@ -162,6 +162,38 @@ Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookf
 - Keine Kalender-/Timeline-Darstellung (PROJ-6), keine Überschneidungs-Warnung (PROJ-7).
 - Kein Anlegen direkt im Kalender, keine Filter/Suche, keine Serien-Aktionen.
 
+## Implementation Notes (Frontend)
+**Stand:** 2026-06-26
+
+**Seite (Server Component):**
+- `src/app/tools/multi-channel-marketing/aktionen/page.tsx`: geschützt (Auth-Check + Redirect). Lädt Aktionen (mit Join `marketplaces(name)` + `brands(name,color)`, sortiert nach `start_date`), Marken- und Kanalliste parallel; mappt Joins auf `marketplace_name`/`brand_name`/`brand_color`; übergibt an `ActionManager`.
+
+**Server-Aktionen:** `src/app/tools/multi-channel-marketing/aktionen/actions.ts`
+- `createAction`, `updateAction`, `deleteAction` (Zod-Validierung via `actionSchema`, Auth-Check, `revalidatePath`; `updateAction` erkennt zwischenzeitlich gelöschte Aktionen).
+- `countActionsForBrand` / `countActionsForChannel`: zählen referenzierende Aktionen für die Lösch-Warnung; **graceful** (jeder Fehler inkl. fehlender Tabelle 42P01 → 0), solange `discount_actions` noch nicht existiert.
+
+**Client-Komponenten (shadcn/ui, keine Eigenbauten):**
+- `src/components/action-manager.tsx`: Liste (`Table`: Titel · Marke mit Farb-Swatch · Kanal · Zeitraum · Rabatt), Datumsformat `DD.MM.YYYY` (eintägig = ein Datum); Leerzustand A (keine Aktion) und **Leerzustand B (keine Marke ODER kein Kanal → Anlegen gesperrt, Links zu Kanal/Marke)**.
+- `src/components/action-form-dialog.tsx`: Anlegen & Bearbeiten (ein Dialog). Titel, Kanal-`Select`, Marken-`Select`, **native `<input type="date">`** für Start/Ende, Rabattwert, Kommentar (`Textarea`). react-hook-form + Zod inkl. Cross-Field-Regel Ende ≥ Start.
+- `src/components/delete-action-dialog.tsx`: `AlertDialog`-Bestätigung mit Titel.
+
+**Querschnitt (Anzahl-Warnung):**
+- `src/components/delete-brand-dialog.tsx` und `src/components/delete-channel-dialog.tsx`: holen beim Öffnen die Anzahl betroffener Aktionen und zeigen eine Warnung („… hat X Rabatt-Aktionen, werden mitgelöscht …"). Bis `discount_actions` existiert, ist die Anzahl 0 (kein Hinweis).
+
+**Geteilte Validierung:** `src/lib/action-validation.ts` (`actionSchema`: Titel ≤ 80, Rabattwert ≤ 50, Kommentar ≤ 500, UUID für Kanal/Marke, ISO-Datum, Ende ≥ Start).
+
+**Dashboard-Einstieg:** `src/app/page.tsx`: fünfte Kachel „Rabatt-Aktionen" (Icon `BadgePercent`).
+
+**Verifikation:** `tsc --noEmit` fehlerfrei; `next build` erfolgreich (Route `/tools/multi-channel-marketing/aktionen`).
+
+**⚠️ Offen für `/backend`:** Tabelle `public.discount_actions` existiert noch nicht — Seite gebaut, zur Laufzeit erst nach Migration funktionsfähig. `/backend` muss anlegen:
+- `discount_actions`: `id`, `title`, `marketplace_id` (uuid), `brand_id` (uuid), `start_date` (date), `end_date` (date), `discount_value` (text), `comment` (text, nullable), Audit-Spalten.
+- **Fremdschlüssel** `marketplace_id` → `marketplaces(id)` **ON DELETE CASCADE** und `brand_id` → `brands(id)` **ON DELETE CASCADE** (Mitlöschen).
+- **Check-Constraints:** `length(trim(title)) between 1 and 80`; `length(trim(discount_value)) between 1 and 50`; `comment` ≤ 500; `end_date >= start_date`.
+- Indizes auf `marketplace_id`, `brand_id`, `start_date`.
+- **Audit-Trigger** (wie `set_product_groups_audit`), RLS nach PROJ-1-Konvention (anon kein Zugriff; authenticated voll).
+- Optional: Unit-Tests für `action-validation.ts`.
+
 ## QA Test Results
 _To be added by /qa_
 
