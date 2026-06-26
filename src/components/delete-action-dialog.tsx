@@ -23,12 +23,15 @@ type DeleteActionDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   action: DiscountAction | null;
+  /** Called after a successful delete (e.g. to refresh the calendar). */
+  onSuccess?: () => void;
 };
 
 export function DeleteActionDialog({
   open,
   onOpenChange,
   action,
+  onSuccess,
 }: DeleteActionDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -45,6 +48,7 @@ export function DeleteActionDialog({
     }
 
     toast.success("Aktion gelöscht.");
+    onSuccess?.();
     onOpenChange(false);
   }
 

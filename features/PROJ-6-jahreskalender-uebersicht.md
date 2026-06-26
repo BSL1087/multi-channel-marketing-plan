@@ -147,6 +147,34 @@ Keine neuen. Wiederverwendet: shadcn/ui (Tooltip, Button, Card, Dialog/AlertDial
 ### Was dieses Feature NICHT enthält (Architektur-Sicht)
 - Kein Filter (Folge-Feature; Webshop-Filter braucht Kanal-Typ), keine Kannibalisierungs-Warnung (PROJ-7), kein Monats-Zoom/Klick-auf-leer (PROJ-8), kein Drag&Drop, kein Export.
 
+## Implementation Notes (Frontend)
+**Stand:** 2026-06-26
+
+**Seite (Server Component):**
+- `src/app/tools/multi-channel-marketing/page.tsx`: ersetzt den bisherigen Platzhalter durch den Kalender. Geschützt (Auth-Check + Redirect). Liest das Jahr aus `?year=` (Default = laufendes Jahr, validiert). Lädt parallel: Aktionen mit Jahres-Überlappung (`start_date <= JJJJ-12-31 AND end_date >= JJJJ-01-01`, Join `marketplaces(name)` + `brands(name,color)`), alle Kanäle (Zeilen) und die Markenliste (für den Dialog). Mappt Joins auf `marketplace_name`/`brand_name`/`brand_color`.
+
+**Layout-Logik (pure, testbar):** `src/lib/calendar-layout.ts`
+- `barGeometry`: Position/Breite eines Balkens als Prozent des Jahres (Tag-im-Jahr-Anteil), auf das Jahr geclippt; `null` wenn außerhalb.
+- `layoutChannel`: Greedy-Intervall-Partitionierung → weist überlappenden Aktionen Unterzeilen (`lane`) zu, ohne Überlagerung; liefert `lanes`-Anzahl.
+- `monthColumns`: proportionale Monatsspalten (Jan–Dez) für Achse + Rasterlinien.
+- `isLightColor`: Helligkeit der Markenfarbe → Auto-Kontrast der Beschriftung.
+- `formatDate`: ISO → `DD.MM.YYYY`.
+
+**Client-Komponente:** `src/components/calendar-view.tsx`
+- Toolbar: Jahr mit Vor/Zurück (ändert `?year=` via `router.push`) + „Aktion hinzufügen".
+- Monatsachse + je Kanal eine Zeile (Höhe = `lanes`), Balken absolut positioniert (Markenfarbe, Auto-Kontrast-Text, abgeschnittener Markenname, Mindestbreite); Monats-Rasterlinien.
+- **Hover** → `Tooltip` (Titel, Marke·Kanal, Zeitraum, Rabatt, Kommentar). **Klick** → `ActionFormDialog` (Bearbeiten). „Aktion hinzufügen" → derselbe Dialog (neu).
+- Nach Speichern → `router.refresh()` lädt die Server-Daten neu.
+- Leerzustände: keine Kanäle → Hinweis + Link; Kanäle aber keine Aktion im Jahr → Hinweisbanner über den (leeren) Zeilen.
+
+**PROJ-5-Dialoge erweitert:** `ActionFormDialog` und `DeleteActionDialog` haben einen optionalen `onSuccess`-Callback bekommen (abwärtskompatibel), den der Kalender für `router.refresh()` nutzt.
+
+**Verifikation:** `tsc --noEmit` fehlerfrei; `next build` erfolgreich.
+
+**Bewusste Abweichung (für Smoke-Test):** Der Klick auf einen Balken öffnet den **Bearbeiten**-Dialog; **Löschen** ist dort (noch) nicht enthalten — Löschen erfolgt aktuell über die Aktions-Liste (`/aktionen`). Die Spec-AC nennt „bearbeiten oder löschen" im Kalender; ein Löschen-Button im Bearbeiten-Dialog kann als kleiner Folgeschritt ergänzt werden, falls gewünscht.
+
+**Kein Backend nötig:** Daten stammen aus PROJ-3/4/5; keine neue Tabelle, keine neuen Pakete.
+
 ## QA Test Results
 _To be added by /qa_
 

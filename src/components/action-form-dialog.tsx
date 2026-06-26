@@ -51,6 +51,8 @@ type ActionFormDialogProps = {
   action: DiscountAction | null;
   brands: Option[];
   channels: Option[];
+  /** Called after a successful save (e.g. to refresh the calendar). */
+  onSuccess?: () => void;
 };
 
 function today(): string {
@@ -63,6 +65,7 @@ export function ActionFormDialog({
   action,
   brands,
   channels,
+  onSuccess,
 }: ActionFormDialogProps) {
   const isEdit = action !== null;
 
@@ -115,6 +118,7 @@ export function ActionFormDialog({
     }
 
     toast.success(isEdit ? "Aktion gespeichert." : "Aktion angelegt.");
+    onSuccess?.();
     onOpenChange(false);
   }
 
