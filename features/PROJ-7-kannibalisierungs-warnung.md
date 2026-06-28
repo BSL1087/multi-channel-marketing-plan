@@ -54,6 +54,7 @@
 ## Open Questions
 <!-- Unresolved questions from the spec interview. Close them in /refine when answered. -->
 - [ ] Soll die Warnung später auch dauerhaft im Kalender markiert werden (Icon/Hervorhebung)? (Folge-Feature)
+- [ ] **PROJ-6-Kalender auf Mehrmarken-Modell nachziehen** (lädt Marke noch im Einzel-Modell) — nötig für korrekte Anzeige und für das Anlegen mit Warnung direkt aus dem Kalender.
 
 ## Decision Log
 
@@ -72,12 +73,58 @@
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| Serverseitige Konflikt-Prüf-Aktion (`findActionConflicts`) getrennt vom Speichern | Verlässliche Prüfung mit Nutzer-Sitzung/RLS; eine Abfrage; wiederverwendbar in Liste & Kalender | 2026-06-26 |
+| Zwei-Schritt-Flow im Formular: erst prüfen → ggf. warnen → dann speichern | „Warnen statt blockieren"; `createAction`/`updateAction` bleiben unverändert (kein Force-Flag nötig) | 2026-06-26 |
+| Überschneidung per DB-Abfrage: `existing.start_date <= neu.end AND existing.end_date >= neu.start` und **gemeinsame Marke** über `discount_action_brands`; Selbst-Ausschluss per `action_id` | Standard-Intervallüberlappung; nutzt die Mehrmarken-Verknüpfung | 2026-06-26 |
+| Ergebnis je Konflikt: Marke + Kanal + Zeitraum + Flag „gleicher/anderer Kanal" | Dialog kann nach Doppelrabatt (gleicher Kanal) und Kannibalisierung (anderer Kanal) gruppieren | 2026-06-26 |
+| Neuer `ConflictWarningDialog` (AlertDialog), wiederverwendet im bestehenden `ActionFormDialog` | Greift automatisch in Liste **und** Kalender (gleicher Dialog) | 2026-06-26 |
+| Bei Prüf-Fehler nicht blockieren (im Zweifel speicherbar) | Eine technische Störung soll die Arbeit nicht verhindern | 2026-06-26 |
+| Keine neuen Pakete, kein neues Schema | AlertDialog vorhanden; nur Lese-Abfrage auf bestehende Tabellen | 2026-06-26 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+**Stand:** 2026-06-26
+
+### Überblick
+PROJ-7 fügt **keine** neuen Daten hinzu — es prüft beim Speichern einer Aktion, ob eine **gleiche Marke** in einem **überlappenden Zeitraum** bereits in einer anderen Aktion rabattiert ist, und zeigt bei Treffern einen nicht-blockierenden Warn-Dialog. Die Prüfung läuft serverseitig über die bestehenden Tabellen (`discount_actions`, `discount_action_brands`, `marketplaces`, `brands`). Da der bestehende `ActionFormDialog` aus PROJ-5 sowohl in der Aktions-Liste als auch im Kalender (PROJ-6) genutzt wird, wirkt die Warnung überall automatisch.
+
+### Ablauf (Zwei-Schritt beim Speichern)
+```
+ActionFormDialog (Speichern geklickt)
+├── 1. Formular validieren (wie bisher)
+├── 2. findActionConflicts(kanal, zeitraum, markenIds, excludeId?)   [Server]
+│      → Liste der Konflikte (Marke · Kanal · Zeitraum · gleicher/anderer Kanal)
+├── 3a. keine Konflikte → direkt speichern (createAction/updateAction)
+└── 3b. Konflikte → ConflictWarningDialog öffnen
+        ├── Gruppe „Gleicher Kanal — Doppelrabatt-Risiko": Marke · Kanal · Zeitraum
+        ├── Gruppe „Anderer Kanal — Kannibalisierung": Marke · Kanal · Zeitraum
+        ├── „Trotzdem speichern" → speichern → onSuccess
+        └── „Abbrechen" → zurück zum Formular (Eingaben bleiben)
+```
+
+### Konflikt-Erkennung (in einfacher Sprache)
+Eine andere Aktion ist ein Konflikt, wenn **alle** zutreffen:
+- sie ist **nicht** die gerade bearbeitete Aktion (Selbst-Ausschluss),
+- ihr Zeitraum **überschneidet** sich mit dem neuen (mind. ein gemeinsamer Tag),
+- sie teilt **mindestens eine Marke** mit der neuen Aktion.
+
+Pro Treffer wird festgehalten: betroffene **Marke**, **Kanal** + **Zeitraum** der bestehenden Aktion, und ob es **derselbe** Kanal (→ Doppelrabatt) oder ein **anderer** Kanal (→ Kannibalisierung) ist.
+
+### Komponenten/Bausteine
+- **`findActionConflicts`** — neue Server-Aktion (`use server`) in der Aktionen-Logik; eine Abfrage über die Verknüpfungstabelle mit Überlappungs- und Marken-Filter; liefert die Konfliktliste.
+- **`ConflictWarningDialog`** — neue Client-Komponente (shadcn `AlertDialog`), zeigt die zwei Gruppen und „Trotzdem speichern"/„Abbrechen".
+- **`ActionFormDialog`** (aus PROJ-5) — Submit-Handler wird um den Prüf-Schritt erweitert (prüfen → ggf. warnen → speichern). `createAction`/`updateAction` bleiben unverändert.
+
+### Datenmodell
+Keine Änderung. Genutzt: `discount_actions` (Zeitraum, Kanal), `discount_action_brands` (Marken je Aktion), `marketplaces` (Kanalname), `brands` (Markenname). RLS wie bisher.
+
+### Benötigte Pakete
+Keine neuen.
+
+### Hinweis / Abhängigkeit
+Der **Jahreskalender (PROJ-6)** lädt die Marke noch im alten Einzel-Modell und muss auf die Mehrmarken-Verknüpfung nachgezogen werden, damit Aktionen dort korrekt erscheinen und die Warnung beim Anlegen aus dem Kalender sinnvoll greift (siehe Open Questions). Das ist unabhängig von der PROJ-7-Logik, aber für die durchgängige Nutzung relevant.
 
 ## QA Test Results
 _To be added by /qa_
