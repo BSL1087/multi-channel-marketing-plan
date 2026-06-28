@@ -8,7 +8,10 @@ import {
   deleteBrand,
   type Brand,
 } from "@/app/tools/multi-channel-marketing/marken/actions";
-import { countActionsForBrand } from "@/app/tools/multi-channel-marketing/aktionen/actions";
+import {
+  getBrandDeletionImpact,
+  type BrandDeletionImpact,
+} from "@/app/tools/multi-channel-marketing/aktionen/actions";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -32,15 +35,15 @@ export function DeleteBrandDialog({
   brand,
 }: DeleteBrandDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [actionCount, setActionCount] = useState<number | null>(null);
+  const [impact, setImpact] = useState<BrandDeletionImpact | null>(null);
 
-  // Count the actions that will be cascade-deleted with this brand.
+  // Work out how deleting this brand affects its discount actions.
   useEffect(() => {
     let cancelled = false;
     if (open && brand) {
-      setActionCount(null);
-      countActionsForBrand(brand.id).then((count) => {
-        if (!cancelled) setActionCount(count);
+      setImpact(null);
+      getBrandDeletionImpact(brand.id).then((result) => {
+        if (!cancelled) setImpact(result);
       });
     }
     return () => {
@@ -64,7 +67,9 @@ export function DeleteBrandDialog({
     onOpenChange(false);
   }
 
-  const hasActions = (actionCount ?? 0) > 0;
+  const total = impact?.total ?? 0;
+  const removed = impact?.removed ?? 0;
+  const kept = total - removed;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -77,17 +82,28 @@ export function DeleteBrandDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {hasActions && (
+        {total > 0 && (
           <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Diese Marke hat {actionCount}{" "}
-              {actionCount === 1 ? "Rabatt-Aktion" : "Rabatt-Aktionen"}. Beim
-              Löschen {actionCount === 1 ? "wird diese" : "werden diese"}{" "}
-              ebenfalls dauerhaft entfernt und {actionCount === 1
-                ? "verschwindet"
-                : "verschwinden"}{" "}
-              aus dem Kalender.
+              Diese Marke ist {total}{" "}
+              {total === 1 ? "Rabatt-Aktion" : "Rabatt-Aktionen"} zugeordnet.{" "}
+              {removed > 0 && (
+                <>
+                  {removed === total
+                    ? `${removed === 1 ? "Diese wird" : "Diese werden"} beim Löschen ebenfalls dauerhaft entfernt`
+                    : `${removed} davon ${removed === 1 ? "hat" : "haben"} nur diese Marke und ${removed === 1 ? "wird" : "werden"} mitgelöscht`}
+                  {kept > 0
+                    ? `; die übrigen ${kept} ${kept === 1 ? "bleibt" : "bleiben"} mit ihren anderen Marken erhalten.`
+                    : " und verschwinden aus dem Kalender."}
+                </>
+              )}
+              {removed === 0 && (
+                <>
+                  {total === 1 ? "Diese bleibt" : "Diese bleiben"} erhalten – nur
+                  die Zuordnung zu dieser Marke wird entfernt.
+                </>
+              )}
             </span>
           </p>
         )}

@@ -14,7 +14,7 @@ function validInput(overrides: Record<string, unknown> = {}) {
   return {
     title: "Sommer-Sale",
     marketplaceId: CHANNEL,
-    brandId: BRAND,
+    brandIds: [BRAND],
     startDate: "2026-03-01",
     endDate: "2026-03-05",
     discountValue: "20%",
@@ -71,9 +71,22 @@ describe("actionSchema", () => {
     expect(actionSchema.safeParse(validInput({ marketplaceId: "" })).success).toBe(
       false,
     );
-    expect(actionSchema.safeParse(validInput({ brandId: "nope" })).success).toBe(
+    expect(
+      actionSchema.safeParse(validInput({ brandIds: ["nope"] })).success,
+    ).toBe(false);
+  });
+
+  it("requires at least one brand", () => {
+    expect(actionSchema.safeParse(validInput({ brandIds: [] })).success).toBe(
       false,
     );
+  });
+
+  it("accepts multiple brands", () => {
+    const SECOND = "323e4567-e89b-12d3-a456-426614174002";
+    expect(
+      actionSchema.safeParse(validInput({ brandIds: [BRAND, SECOND] })).success,
+    ).toBe(true);
   });
 
   it("rejects a malformed date", () => {

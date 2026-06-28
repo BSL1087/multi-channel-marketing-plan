@@ -107,7 +107,7 @@ export function ActionManager({
           </div>
           <h2 className="mt-4 font-medium">Noch keine Aktionen angelegt</h2>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Lege deine erste Rabatt-Aktion an (Kanal, Marke, Zeitraum,
+            Lege deine erste Rabatt-Aktion an (Kanal, Marke(n), Zeitraum,
             Rabattwert).
           </p>
           <Button onClick={openCreate} size="sm" className="mt-4">
@@ -121,7 +121,7 @@ export function ActionManager({
             <TableHeader>
               <TableRow>
                 <TableHead>Titel</TableHead>
-                <TableHead>Marke</TableHead>
+                <TableHead>Marken</TableHead>
                 <TableHead>Kanal</TableHead>
                 <TableHead>Zeitraum</TableHead>
                 <TableHead>Rabatt</TableHead>
@@ -133,13 +133,20 @@ export function ActionManager({
                 <TableRow key={action.id}>
                   <TableCell className="font-medium">{action.title}</TableCell>
                   <TableCell>
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="block h-4 w-4 shrink-0 rounded-full border"
-                        style={{ backgroundColor: action.brand_color }}
-                        aria-hidden
-                      />
-                      {action.brand_name}
+                    <span className="flex flex-wrap gap-x-3 gap-y-1">
+                      {action.brands.map((brand) => (
+                        <span
+                          key={brand.id}
+                          className="inline-flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <span
+                            className="block h-4 w-4 shrink-0 rounded-full border"
+                            style={{ backgroundColor: brand.color }}
+                            aria-hidden
+                          />
+                          {brand.name}
+                        </span>
+                      ))}
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">

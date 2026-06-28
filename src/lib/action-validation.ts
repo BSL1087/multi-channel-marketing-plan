@@ -33,7 +33,9 @@ export const actionSchema = z
   .object({
     title: actionTitleSchema,
     marketplaceId: z.string().uuid({ message: "Bitte einen Kanal auswählen." }),
-    brandId: z.string().uuid({ message: "Bitte eine Marke auswählen." }),
+    brandIds: z
+      .array(z.string().uuid({ message: "Bitte gültige Marken auswählen." }))
+      .min(1, { message: "Bitte mindestens eine Marke auswählen." }),
     startDate: isoDateSchema,
     endDate: isoDateSchema,
     discountValue: discountValueSchema,

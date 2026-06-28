@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
-import type { DiscountAction } from "@/app/tools/multi-channel-marketing/aktionen/actions";
+import type {
+  ActionBrand,
+  DiscountAction,
+} from "@/app/tools/multi-channel-marketing/aktionen/actions";
 import {
   layoutChannel,
   monthColumns,
@@ -28,6 +31,31 @@ type BrandOption = {
   color: string;
   product_group_name: string;
 };
+
+/**
+ * One renderable bar = one brand of one action. A multi-brand action produces
+ * several segments (one per brand), so every brand keeps its own coloured track
+ * — which is what makes per-brand overlaps visible across channels.
+ */
+type ActionSegment = {
+  id: string;
+  start_date: string;
+  end_date: string;
+  action: DiscountAction;
+  brand: ActionBrand;
+};
+
+function toSegments(actions: DiscountAction[]): ActionSegment[] {
+  return actions.flatMap((action) =>
+    action.brands.map((brand) => ({
+      id: `${action.id}:${brand.id}`,
+      start_date: action.start_date,
+      end_date: action.end_date,
+      action,
+      brand,
+    })),
+  );
+}
 
 const BAR_HEIGHT = 8; // px — unlabeled day-accurate colour bar
 const ROW_BASE = 40; // px — default row height; holds up to BASE_LANES bars
@@ -64,9 +92,12 @@ export function CalendarView({
 
   const months = useMemo(() => monthColumns(), []);
 
+  // One bar per (action × brand). Multi-brand actions become several segments.
+  const segments = useMemo(() => toSegments(actions), [actions]);
+
   // Colour legend: brands that appear in the displayed year, grouped by product group.
   const legend = useMemo(() => {
-    const present = new Set(actions.map((a) => a.brand_id));
+    const present = new Set(segments.map((s) => s.brand.id));
     const groups = new Map<string, BrandOption[]>();
     for (const b of brands) {
       if (!present.has(b.id)) continue;
@@ -80,21 +111,22 @@ export function CalendarView({
         items: items.sort((a, b) => a.name.localeCompare(b.name, "de")),
       }))
       .sort((a, b) => a.group.localeCompare(b.group, "de"));
-  }, [actions, brands]);
+  }, [segments, brands]);
 
-  // Group actions by channel, then lay each channel out into stacked lanes.
+  // Group segments by channel, then lay each channel out into stacked lanes
+  // (keyed by brand, so one brand's non-overlapping bars line up on one track).
   const byChannel = useMemo(() => {
-    const map = new Map<string, DiscountAction[]>();
-    for (const a of actions) {
-      const list = map.get(a.marketplace_id) ?? [];
-      list.push(a);
-      map.set(a.marketplace_id, list);
+    const map = new Map<string, ActionSegment[]>();
+    for (const s of segments) {
+      const list = map.get(s.action.marketplace_id) ?? [];
+      list.push(s);
+      map.set(s.action.marketplace_id, list);
     }
     return channels.map((c) => ({
       channel: c,
-      layout: layoutChannel(map.get(c.id) ?? [], year, (a) => a.brand_id),
+      layout: layoutChannel(map.get(c.id) ?? [], year, (s) => s.brand.id),
     }));
-  }, [actions, channels, year]);
+  }, [segments, channels, year]);
 
   function openCreate() {
     setEditing(null);
@@ -213,8 +245,8 @@ export function CalendarView({
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          onClick={() => openEdit(item)}
-                          aria-label={`${item.title} (${item.brand_name})`}
+                          onClick={() => openEdit(item.action)}
+                          aria-label={`${item.action.title} (${item.brand.name})`}
                           className="absolute rounded-[2px] ring-1 ring-black/10 transition-[filter] hover:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           style={{
                             left: pct(leftPx),
@@ -222,23 +254,26 @@ export function CalendarView({
                             minWidth: 2,
                             top: lane * slot + (slot - BAR_HEIGHT) / 2,
                             height: BAR_HEIGHT,
-                            backgroundColor: item.brand_color,
+                            backgroundColor: item.brand.color,
                           }}
                         />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
-                        <p className="font-semibold">{item.title}</p>
+                        <p className="font-semibold">{item.action.title}</p>
                         <p className="text-xs">
-                          {item.brand_name} · {item.marketplace_name}
+                          {item.action.brands.map((b) => b.name).join(", ")} ·{" "}
+                          {item.action.marketplace_name}
                         </p>
                         <p className="text-xs">
                           {formatDate(item.start_date)} –{" "}
                           {formatDate(item.end_date)}
                         </p>
-                        <p className="text-xs">Rabatt: {item.discount_value}</p>
-                        {item.comment && (
+                        <p className="text-xs">
+                          Rabatt: {item.action.discount_value}
+                        </p>
+                        {item.action.comment && (
                           <p className="mt-1 text-xs italic text-muted-foreground">
-                            {item.comment}
+                            {item.action.comment}
                           </p>
                         )}
                       </TooltipContent>

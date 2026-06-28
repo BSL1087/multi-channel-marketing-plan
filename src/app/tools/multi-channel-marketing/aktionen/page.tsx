@@ -7,17 +7,20 @@ import { Button } from "@/components/ui/button";
 import { ActionManager } from "@/components/action-manager";
 import type { DiscountAction } from "./actions";
 
+type BrandJoin = { id: string; name: string; color: string };
+
 type ActionRow = {
   id: string;
   title: string;
   marketplace_id: string;
-  brand_id: string;
   start_date: string;
   end_date: string;
   discount_value: string;
   comment: string | null;
   marketplaces: { name: string } | { name: string }[] | null;
-  brands: { name: string; color: string } | { name: string; color: string }[] | null;
+  discount_action_brands:
+    | { brands: BrandJoin | BrandJoin[] | null }[]
+    | null;
 };
 
 function one<T>(value: T | T[] | null): T | null {
@@ -40,7 +43,7 @@ export default async function ActionsPage() {
       supabase
         .from("discount_actions")
         .select(
-          "id, title, marketplace_id, brand_id, start_date, end_date, discount_value, comment, marketplaces(name), brands(name, color)",
+          "id, title, marketplace_id, start_date, end_date, discount_value, comment, marketplaces(name), discount_action_brands(brands(id, name, color))",
         )
         .order("start_date", { ascending: true })
         .returns<ActionRow[]>(),
@@ -56,19 +59,20 @@ export default async function ActionsPage() {
 
   const actions: DiscountAction[] = (actionRows ?? []).map((a) => {
     const mp = one(a.marketplaces);
-    const br = one(a.brands);
+    const brands = (a.discount_action_brands ?? [])
+      .map((link) => one(link.brands))
+      .filter((b): b is BrandJoin => b !== null)
+      .sort((x, y) => x.name.localeCompare(y.name, "de"));
     return {
       id: a.id,
       title: a.title,
       marketplace_id: a.marketplace_id,
-      brand_id: a.brand_id,
       start_date: a.start_date,
       end_date: a.end_date,
       discount_value: a.discount_value,
       comment: a.comment,
       marketplace_name: mp?.name ?? "—",
-      brand_name: br?.name ?? "—",
-      brand_color: br?.color ?? "#999999",
+      brands,
     };
   });
 
