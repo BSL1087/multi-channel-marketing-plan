@@ -21,7 +21,7 @@
 | PROJ-4 | Marken verwalten (mit Farbe) | Approved | P0 | PROJ-1, PROJ-2, PROJ-11 | PROJ-4-marken-verwalten.md | 2026-06-23 |
 | PROJ-5 | Rabatt-Aktionen anlegen & bearbeiten | Approved | P0 | PROJ-3, PROJ-4 | PROJ-5-rabatt-aktionen-anlegen-bearbeiten.md | 2026-06-23 |
 | PROJ-6 | Jahreskalender-Übersicht | Approved | P0 | PROJ-5 | PROJ-6-jahreskalender-uebersicht.md | 2026-06-23 |
-| PROJ-7 | Kannibalisierungs-Warnung | Roadmap | P0 | PROJ-5 | — | 2026-06-23 |
+| PROJ-7 | Kannibalisierungs-Warnung | Planned | P0 | PROJ-5 | PROJ-7-kannibalisierungs-warnung.md | 2026-06-23 |
 | PROJ-8 | Monats-Zoom / Tagesansicht | Roadmap | P1 | PROJ-6 | — | 2026-06-23 |
 | PROJ-9 | Aktivitätsprotokoll (wer hat was gemacht) | Roadmap | P1 | PROJ-2 | — | 2026-06-23 |
 | PROJ-10 | Logo-Uploads für Marken & Marketplaces | Roadmap | P1 | PROJ-3, PROJ-4 | — | 2026-06-23 |
