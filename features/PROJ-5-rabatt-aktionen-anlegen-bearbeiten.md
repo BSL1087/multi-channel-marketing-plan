@@ -258,5 +258,29 @@ Keine neuen. Wiederverwendet: `@supabase/ssr`, `react-hook-form`, `zod`, `@hookf
 - **Production Ready:** YES
 - **Recommendation:** PROJ-5 freigeben. Kannibalisierungs-Warnung (vom Nutzer gewünscht) ist als **PROJ-7** eingeplant. E2E-Suite bei Gelegenheit in CI ausführen.
 
+## Update: Mehrere Marken je Aktion (Mehrfachauswahl)
+**Stand:** 2026-06-28 — Nutzer-Wunsch: Eine Aktion betrifft oft mehrere Marken; statt sie je Marke einzeln anzulegen, gibt es jetzt eine Mehrfachauswahl (Checkboxen).
+
+### Was sich geändert hat
+- **Datenmodell:** Aus der 1:1-Beziehung (`discount_actions.brand_id`) wurde eine **n:m-Beziehung** über die neue Zwischentabelle **`discount_action_brands`** (`action_id`, `brand_id`, beide FK **ON DELETE CASCADE**, zusammengesetzter PK). Die alte Spalte `brand_id` wurde entfernt; die 6 bestehenden Aktionen wurden verlustfrei migriert (je 1 Marke → 1 Junction-Zeile).
+- **Integritäts-Regel:** Eine Aktion muss **immer ≥ 1 Marke** haben. DB-Trigger `discount_action_brands_cleanup` löscht eine Aktion automatisch, sobald ihre **letzte** Marken-Zuordnung entfernt wird. Hat sie noch andere Marken, bleibt sie bestehen.
+- **Formular (`action-form-dialog.tsx`):** Marken-`Select` → **Checkbox-Mehrfachauswahl** (scrollbare Liste, „mindestens eine Marke"-Validierung). Beim Bearbeiten sind die zugeordneten Marken vorausgewählt.
+- **Liste (`action-manager.tsx`):** Spalte „Marke" → „Marken"; zeigt alle Marken der Aktion mit Farb-Swatch.
+- **Kalender (`calendar-view.tsx`):** Eine Aktion wird als **ein Balken je Marke** dargestellt (jede Marke behält ihre Farbspur) — Voraussetzung für die per-Marke-Überschneidungslogik (PROJ-7). Tooltip listet alle Marken.
+- **Marke löschen (`delete-brand-dialog.tsx`):** Warnung unterscheidet jetzt zwischen Aktionen, die **nur** diese Marke haben (werden mitgelöscht) und Aktionen, die **mit ihren anderen Marken erhalten** bleiben. Neue Server-Funktion `getBrandDeletionImpact` (ersetzt `countActionsForBrand`).
+- **Validierung (`action-validation.ts`):** `brandId` (UUID) → `brandIds` (`string[]`, min 1).
+- **Server-Aktionen (`actions.ts`):** `createAction`/`updateAction` schreiben/synchronisieren die Junction-Zeilen. `updateAction` nutzt **Upsert-dann-Prune** (neue Zuordnungen zuerst, dann entfernte löschen), damit die Aktion nie kurzzeitig 0 Marken hat und der Cleanup-Trigger sie nicht beim Bearbeiten löscht.
+
+### Verifikation
+- `tsc --noEmit` fehlerfrei; `next build` erfolgreich.
+- Unit-Tests **44/44** grün (inkl. 2 neue für Mehrfach-Marken in `action-validation.test.ts`).
+- DB-Trigger per SQL (Transaktion + Rollback) bestätigt: Aktion mit 2 Marken überlebt das Entfernen **einer** Marke, wird beim Entfernen der **letzten** Marke automatisch gelöscht. Bestandsdaten unverändert (6 Aktionen / 6 Zuordnungen).
+- Security-Advisors: keine offenen Befunde für die neue Tabelle (RLS nach PROJ-1-Konvention `auth.uid() IS NOT NULL`); projektweit verbleibt nur `auth_leaked_password_protection`.
+
+### Migrationen
+- `discount_actions_multi_brand` (Zwischentabelle + Datenmigration + RLS + Spalte `brand_id` entfernen)
+- `discount_action_delete_when_no_brands` (Cleanup-Trigger)
+- `discount_action_brands_align_rls` (RLS-Ausdruck an Projekt-Konvention angeglichen)
+
 ## Deployment
 _To be added by /deploy_
