@@ -224,4 +224,10 @@ Umgesetzt gemäß Tech Design — reine Frontend-Erweiterung, kein neues Schema,
 - **Recommendation:** **Deploy** → `/deploy`. Kein Backend nötig.
 
 ## Deployment
-_To be added by /deploy_
+**Deployed:** 2026-06-29
+**Production URL:** https://multi-channel-marketing.vercel.app
+**Vercel-Projekt:** `agon-s-world/multi-channel-marketing`
+
+Erster Production-Deploy der gesamten App (PROJ-1…8 + PROJ-11) via Vercel CLI (`vercel --prod`). Verifiziert: `/login` → HTTP 200, `/` → 307 Redirect auf `/login` (Auth-Schutz), alle 4 Security-Header live (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS). Env-Vars (`NEXT_PUBLIC_SUPABASE_*`) für Production/Preview/Development gesetzt. Git-Tag `v1.0.0`.
+
+**Offen:** GitHub-Auto-Deploy noch nicht verbunden (Repo `BSL1087/...` vs. Team-Scope `agon-s-world`) — bis dahin Deploys manuell per `vercel --prod`.
