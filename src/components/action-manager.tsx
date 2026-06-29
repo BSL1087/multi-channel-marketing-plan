@@ -18,6 +18,7 @@ import { ActionFormDialog } from "@/components/action-form-dialog";
 import { DeleteActionDialog } from "@/components/delete-action-dialog";
 
 type Option = { id: string; name: string };
+type BrandOption = { id: string; name: string; product_group_name: string };
 
 function formatDate(iso: string): string {
   const [y, m, d] = iso.split("-");
@@ -37,7 +38,7 @@ export function ActionManager({
   channels,
 }: {
   actions: DiscountAction[];
-  brands: Option[];
+  brands: BrandOption[];
   channels: Option[];
 }) {
   const [formOpen, setFormOpen] = useState(false);

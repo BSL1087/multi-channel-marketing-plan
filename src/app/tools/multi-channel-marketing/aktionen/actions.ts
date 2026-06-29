@@ -69,6 +69,11 @@ function uniqueBrandIds(input: ActionInput): string[] {
   return [...new Set(input.brandIds)];
 }
 
+/** Normalises a PostgREST embedded relation that may come back as object or array. */
+function one<T>(value: T | T[] | null): T | null {
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 export async function createAction(input: ActionInput): Promise<ActionResult> {
   const parsed = validate(input);
   if (!parsed.success) {
@@ -159,6 +164,117 @@ export async function updateAction(
 
   revalidatePath(PATH);
   return { ok: true };
+}
+
+/** One existing action that overlaps the action being saved on a shared brand. */
+export type ActionConflict = {
+  /** The shared brand that triggered the conflict. */
+  brandId: string;
+  brandName: string;
+  /** The pre-existing (conflicting) action. */
+  actionId: string;
+  actionTitle: string;
+  channelName: string;
+  startDate: string;
+  endDate: string;
+  /** Same channel → double-discount risk; different channel → cannibalisation. */
+  sameChannel: boolean;
+};
+
+export type ConflictInput = {
+  marketplaceId: string;
+  brandIds: string[];
+  startDate: string;
+  endDate: string;
+  /** The action being edited, excluded from its own conflict check. */
+  excludeId?: string;
+};
+
+export type ConflictCheck =
+  | { ok: true; conflicts: ActionConflict[] }
+  // The check failed technically — the caller must not block the user (PROJ-7).
+  | { ok: false };
+
+type ConflictRow = {
+  brand_id: string;
+  brands: { name: string } | { name: string }[] | null;
+  discount_actions:
+    | {
+        id: string;
+        title: string;
+        marketplace_id: string;
+        start_date: string;
+        end_date: string;
+        marketplaces: { name: string } | { name: string }[] | null;
+      }
+    | {
+        id: string;
+        title: string;
+        marketplace_id: string;
+        start_date: string;
+        end_date: string;
+        marketplaces: { name: string } | { name: string }[] | null;
+      }[]
+    | null;
+};
+
+/**
+ * Finds existing actions that overlap the given period and share at least one
+ * brand with the action being saved (PROJ-7). Pure read; never writes. Two
+ * intervals overlap when `existing.start <= new.end AND existing.end >= new.start`
+ * (one shared day counts). The action being edited is excluded via `excludeId`.
+ * Returns `{ ok: false }` on any technical error so the caller can save in doubt
+ * rather than block the user.
+ */
+export async function findActionConflicts(
+  input: ConflictInput,
+): Promise<ConflictCheck> {
+  const brandIds = [...new Set(input.brandIds)];
+  if (brandIds.length === 0) return { ok: true, conflicts: [] };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false };
+
+  const { data, error } = await supabase
+    .from("discount_action_brands")
+    .select(
+      "brand_id, brands(name), discount_actions!inner(id, title, marketplace_id, start_date, end_date, marketplaces(name))",
+    )
+    .in("brand_id", brandIds)
+    .lte("discount_actions.start_date", input.endDate)
+    .gte("discount_actions.end_date", input.startDate)
+    .returns<ConflictRow[]>();
+  if (error || !data) return { ok: false };
+
+  const conflicts: ActionConflict[] = [];
+  for (const row of data) {
+    const existing = one(row.discount_actions);
+    if (!existing) continue;
+    // An action never conflicts with itself.
+    if (existing.id === input.excludeId) continue;
+
+    conflicts.push({
+      brandId: row.brand_id,
+      brandName: one(row.brands)?.name ?? "—",
+      actionId: existing.id,
+      actionTitle: existing.title,
+      channelName: one(existing.marketplaces)?.name ?? "—",
+      startDate: existing.start_date,
+      endDate: existing.end_date,
+      sameChannel: existing.marketplace_id === input.marketplaceId,
+    });
+  }
+
+  // Stable, readable order: same-channel (double discount) first, then by brand.
+  conflicts.sort((a, b) => {
+    if (a.sameChannel !== b.sameChannel) return a.sameChannel ? -1 : 1;
+    return a.brandName.localeCompare(b.brandName, "de");
+  });
+
+  return { ok: true, conflicts };
 }
 
 export async function deleteAction(id: string): Promise<ActionResult> {

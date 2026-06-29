@@ -23,6 +23,12 @@ type ActionRow = {
     | null;
 };
 
+type BrandRow = {
+  id: string;
+  name: string;
+  product_groups: { name: string } | { name: string }[] | null;
+};
+
 function one<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
@@ -49,8 +55,9 @@ export default async function ActionsPage() {
         .returns<ActionRow[]>(),
       supabase
         .from("brands")
-        .select("id, name")
-        .order("name", { ascending: true }),
+        .select("id, name, product_groups(name)")
+        .order("name", { ascending: true })
+        .returns<BrandRow[]>(),
       supabase
         .from("marketplaces")
         .select("id, name")
@@ -76,6 +83,12 @@ export default async function ActionsPage() {
     };
   });
 
+  const brandOptions = (brands ?? []).map((b) => ({
+    id: b.id,
+    name: b.name,
+    product_group_name: one(b.product_groups)?.name ?? "Ohne Gruppe",
+  }));
+
   return (
     <div className="min-h-screen bg-secondary/40">
       <header className="border-b bg-background">
@@ -100,7 +113,7 @@ export default async function ActionsPage() {
 
         <ActionManager
           actions={actions}
-          brands={brands ?? []}
+          brands={brandOptions}
           channels={channels ?? []}
         />
       </main>
