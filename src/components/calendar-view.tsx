@@ -204,14 +204,17 @@ export function CalendarView({
               Kanal
             </div>
             <div className="relative h-8 flex-1">
-              {months.map((m) => (
-                <div
+              {months.map((m, i) => (
+                <button
                   key={m.label}
-                  className="absolute top-0 flex h-full items-center justify-center border-l text-xs text-muted-foreground"
+                  type="button"
+                  onClick={() => router.push(`?year=${year}&month=${i + 1}`)}
+                  title={`${m.label} im Detail öffnen`}
+                  className="absolute top-0 flex h-full items-center justify-center border-l text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   style={{ left: pct(m.leftPx), width: pct(m.widthPx) }}
                 >
                   {m.label}
-                </div>
+                </button>
               ))}
             </div>
           </div>

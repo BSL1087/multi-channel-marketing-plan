@@ -5,6 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { CalendarView } from "@/components/calendar-view";
+import { MonthView } from "@/components/month-view";
+import { daysInMonth, resolveMonth } from "@/lib/month-layout";
 import type { DiscountAction } from "./aktionen/actions";
 
 type BrandJoin = { id: string; name: string; color: string };
@@ -50,7 +52,7 @@ function resolveYear(raw: string | undefined): number {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<{ year?: string; month?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -62,9 +64,17 @@ export default async function CalendarPage({
     redirect("/login");
   }
 
-  const year = resolveYear((await searchParams).year);
-  const yearStart = `${year}-01-01`;
-  const yearEnd = `${year}-12-31`;
+  const sp = await searchParams;
+  const year = resolveYear(sp.year);
+  // A present `month` key (even empty/invalid → current month) switches to the
+  // month zoom; absent → year overview.
+  const monthMode = sp.month !== undefined;
+  const monthIndex = resolveMonth(sp.month);
+
+  const mm = String(monthIndex + 1).padStart(2, "0");
+  const dd = String(daysInMonth(year, monthIndex)).padStart(2, "0");
+  const rangeStart = monthMode ? `${year}-${mm}-01` : `${year}-01-01`;
+  const rangeEnd = monthMode ? `${year}-${mm}-${dd}` : `${year}-12-31`;
 
   const [{ data: actionRows }, { data: channels }, { data: brandRows }] =
     await Promise.all([
@@ -73,8 +83,8 @@ export default async function CalendarPage({
         .select(
           "id, title, marketplace_id, start_date, end_date, discount_value, comment, marketplaces(name), discount_action_brands(brands(id, name, color))",
         )
-        .lte("start_date", yearEnd)
-        .gte("end_date", yearStart)
+        .lte("start_date", rangeEnd)
+        .gte("end_date", rangeStart)
         .returns<ActionRow[]>(),
       supabase.from("marketplaces").select("id, name").order("name"),
       supabase
@@ -128,19 +138,29 @@ export default async function CalendarPage({
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Multi-Channel-Marketing — Jahreskalender
+          Multi-Channel-Marketing — Kalender
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Rabatt-Aktionen je Kanal über das Jahr. Fahre über einen Balken für
-          Details, klicke ihn zum Bearbeiten.
+          Rabatt-Aktionen je Kanal. Klicke einen Monatskopf für die
+          Tagesansicht, einen Balken zum Bearbeiten.
         </p>
 
-        <CalendarView
-          year={year}
-          channels={channels ?? []}
-          actions={actions}
-          brands={brands}
-        />
+        {monthMode ? (
+          <MonthView
+            year={year}
+            month={monthIndex}
+            channels={channels ?? []}
+            actions={actions}
+            brands={brands}
+          />
+        ) : (
+          <CalendarView
+            year={year}
+            channels={channels ?? []}
+            actions={actions}
+            brands={brands}
+          />
+        )}
       </main>
     </div>
   );
