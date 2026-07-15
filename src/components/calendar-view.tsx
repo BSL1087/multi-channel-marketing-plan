@@ -303,20 +303,6 @@ export function CalendarView({
                   {m.label}
                 </button>
               ))}
-              {todayLeft !== null && (
-                <>
-                  <div
-                    className="pointer-events-none absolute top-0 z-20 h-full w-px bg-primary"
-                    style={{ left: todayLeft }}
-                    aria-hidden
-                  />
-                  <div
-                    className="absolute top-1 z-20 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary"
-                    style={{ left: todayLeft }}
-                    title={`Heute: ${todayIso ? formatDate(todayIso) : ""}`}
-                  />
-                </>
-              )}
             </div>
           </div>
 
@@ -385,10 +371,10 @@ export function CalendarView({
                   </TooltipProvider>
                 ))}
 
-                {/* "Today" marker line (click-through, spans the row) */}
+                {/* "Today" marker: dashed line, below the month axis, click-through */}
                 {todayLeft !== null && (
                   <div
-                    className="pointer-events-none absolute top-0 z-10 h-full w-px bg-primary/70"
+                    className="pointer-events-none absolute top-0 z-10 h-full w-0 border-l border-dashed border-primary/70"
                     style={{ left: todayLeft }}
                     aria-hidden
                   />
