@@ -150,6 +150,18 @@ export function layoutChannel<T extends CalendarItem>(
   return { lanes: Math.max(lanes.length, 1), items: result };
 }
 
+/**
+ * Pixel x of the CENTRE of a given ISO date within `year`, or null when the
+ * date falls outside the displayed year. Used for the "today" marker line.
+ */
+export function datePx(iso: string, year: number): number | null {
+  const [y, mo, da] = iso.split("-").map(Number);
+  if (!y || !mo || !da) return null;
+  const t = Date.UTC(y, mo - 1, da);
+  if (t < Date.UTC(year, 0, 1) || t > Date.UTC(year, 11, 31)) return null;
+  return dayLeftPx(year, mo - 1, da) + DAY_WIDTH / 2;
+}
+
 /** Fixed-width month columns for the axis (label + pixel position + width). */
 export function monthColumns(): { label: string; leftPx: number; widthPx: number }[] {
   return MONTH_LABELS.map((label, m) => ({
