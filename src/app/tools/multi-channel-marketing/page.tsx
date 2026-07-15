@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { CalendarView } from "@/components/calendar-view";
 import { MonthView } from "@/components/month-view";
 import { daysInMonth, resolveMonth } from "@/lib/month-layout";
+import type { ChannelType } from "@/lib/channel-validation";
 import type { DiscountAction } from "./aktionen/actions";
+
+type ChannelOption = { id: string; name: string; type: ChannelType };
 
 type BrandJoin = { id: string; name: string; color: string };
 
@@ -86,7 +89,11 @@ export default async function CalendarPage({
         .lte("start_date", rangeEnd)
         .gte("end_date", rangeStart)
         .returns<ActionRow[]>(),
-      supabase.from("marketplaces").select("id, name").order("name"),
+      supabase
+        .from("marketplaces")
+        .select("id, name, type")
+        .order("name")
+        .returns<ChannelOption[]>(),
       supabase
         .from("brands")
         .select("id, name, color, product_groups(name)")

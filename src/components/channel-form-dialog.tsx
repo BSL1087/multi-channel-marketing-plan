@@ -9,12 +9,18 @@ import { toast } from "sonner";
 
 import {
   createChannel,
-  renameChannel,
+  updateChannel,
   type Channel,
 } from "@/app/tools/multi-channel-marketing/kanaele/actions";
-import { channelNameSchema } from "@/lib/channel-validation";
+import {
+  CHANNEL_TYPE_LABELS,
+  CHANNEL_TYPES,
+  channelNameSchema,
+  channelTypeSchema,
+} from "@/lib/channel-validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +40,7 @@ import {
 
 const channelSchema = z.object({
   name: channelNameSchema,
+  type: channelTypeSchema,
 });
 
 type ChannelValues = z.infer<typeof channelSchema>;
@@ -54,13 +61,16 @@ export function ChannelFormDialog({
 
   const form = useForm<ChannelValues>({
     resolver: zodResolver(channelSchema),
-    defaultValues: { name: "" },
+    defaultValues: { name: "", type: "marketplace" },
   });
 
-  // Prefill with the current name when opening for an edit, reset for a create.
+  // Prefill with the current values when opening for an edit, reset for a create.
   useEffect(() => {
     if (open) {
-      form.reset({ name: channel?.name ?? "" });
+      form.reset({
+        name: channel?.name ?? "",
+        type: channel?.type ?? "marketplace",
+      });
     }
   }, [open, channel, form]);
 
@@ -68,8 +78,8 @@ export function ChannelFormDialog({
 
   async function onSubmit(values: ChannelValues) {
     const result = isEdit
-      ? await renameChannel(channel.id, values.name)
-      : await createChannel(values.name);
+      ? await updateChannel(channel.id, values.name, values.type)
+      : await createChannel(values.name, values.type);
 
     if (!result.ok) {
       if (result.duplicate) {
@@ -80,7 +90,7 @@ export function ChannelFormDialog({
       return;
     }
 
-    toast.success(isEdit ? "Kanal umbenannt." : "Kanal angelegt.");
+    toast.success(isEdit ? "Kanal gespeichert." : "Kanal angelegt.");
     onOpenChange(false);
   }
 
@@ -89,11 +99,11 @@ export function ChannelFormDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? "Kanal umbenennen" : "Kanal hinzufügen"}
+            {isEdit ? "Kanal bearbeiten" : "Kanal hinzufügen"}
           </DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Ändere den Namen dieses Vertriebskanals."
+              ? "Ändere Name und Typ dieses Vertriebskanals."
               : "Lege einen Marketplace oder eigenen Webshop an (z.B. Amazon, Otto, eigener Shop)."}
           </DialogDescription>
         </DialogHeader>
@@ -113,6 +123,37 @@ export function ChannelFormDialog({
                       disabled={isSubmitting}
                       {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Typ</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      className="gap-2"
+                    >
+                      {CHANNEL_TYPES.map((t) => (
+                        <FormItem
+                          key={t}
+                          className="flex items-center gap-2 space-y-0"
+                        >
+                          <FormControl>
+                            <RadioGroupItem value={t} disabled={isSubmitting} />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {CHANNEL_TYPE_LABELS[t]}
+                          </FormLabel>
+                        </FormItem>
+                      ))}
+                    </RadioGroup>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

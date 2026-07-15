@@ -11,6 +11,23 @@ export const channelNameSchema = z
   .min(1, { message: "Bitte einen Namen eingeben." })
   .max(60, { message: "Der Name darf höchstens 60 Zeichen haben." });
 
+/**
+ * Channel type (PROJ-3 extension): own webshop vs. external marketplace.
+ * Drives the Marketplace/Webshop filter in the year calendar (PROJ-6).
+ */
+export const CHANNEL_TYPES = ["marketplace", "webshop"] as const;
+export type ChannelType = (typeof CHANNEL_TYPES)[number];
+
+export const channelTypeSchema = z.enum(CHANNEL_TYPES, {
+  message: "Bitte einen Kanal-Typ wählen.",
+});
+
+/** Human-readable German labels for each channel type. */
+export const CHANNEL_TYPE_LABELS: Record<ChannelType, string> = {
+  webshop: "Eigener Webshop",
+  marketplace: "Marketplace",
+};
+
 export type ChannelLike = { id: string; name: string };
 
 /**

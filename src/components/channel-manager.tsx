@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Pencil, Plus, Store, Trash2 } from "lucide-react";
 
 import type { Channel } from "@/app/tools/multi-channel-marketing/kanaele/actions";
+import { CHANNEL_TYPE_LABELS } from "@/lib/channel-validation";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { ChannelFormDialog } from "@/components/channel-form-dialog";
@@ -58,6 +60,15 @@ export function ChannelManager({ channels }: { channels: Channel[] }) {
               {channels.map((channel) => (
                 <TableRow key={channel.id}>
                   <TableCell className="font-medium">{channel.name}</TableCell>
+                  <TableCell className="py-2">
+                    <Badge
+                      variant={
+                        channel.type === "webshop" ? "default" : "secondary"
+                      }
+                    >
+                      {CHANNEL_TYPE_LABELS[channel.type]}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="w-px whitespace-nowrap py-2 text-right">
                     <Button
                       variant="ghost"
@@ -65,7 +76,7 @@ export function ChannelManager({ channels }: { channels: Channel[] }) {
                       onClick={() => openEdit(channel)}
                     >
                       <Pencil className="h-4 w-4" />
-                      Umbenennen
+                      Bearbeiten
                     </Button>
                     <Button
                       variant="ghost"
