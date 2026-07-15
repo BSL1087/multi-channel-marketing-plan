@@ -51,7 +51,7 @@ export default async function ActionsPage() {
         .select(
           "id, title, marketplace_id, start_date, end_date, discount_value, comment, marketplaces(name), discount_action_brands(brands(id, name, color))",
         )
-        .order("start_date", { ascending: true })
+        .order("start_date", { ascending: false })
         .returns<ActionRow[]>(),
       supabase
         .from("brands")
