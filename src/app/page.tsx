@@ -1,9 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BadgePercent, CalendarRange, ChevronRight, Store, Tag, Tags } from "lucide-react";
+import { BadgePercent, CalendarRange, ChevronRight, History, Store, Tag, Tags } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
+import { ACTIVITY_LOG_EMAIL } from "@/lib/activity-log";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { LogoutButton } from "@/components/logout-button";
@@ -170,6 +171,33 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           </Link>
+
+          {/* Only visible to the authorised account (PROJ-9). */}
+          {user.email === ACTIVITY_LOG_EMAIL && (
+            <Link
+              href="/tools/multi-channel-marketing/aktivitaet"
+              className="group rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Card className="h-full transition-colors hover:border-primary/40 hover:bg-accent/50">
+                <CardContent className="flex h-full flex-col gap-3 p-5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <History className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="font-medium">Aktivitätsprotokoll</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Nachvollziehen, wer wann was angelegt, geändert oder
+                      gelöscht hat.
+                    </p>
+                  </div>
+                  <span className="mt-auto inline-flex items-center text-sm font-medium text-primary">
+                    Öffnen
+                    <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
         </div>
 
         {/* Account */}

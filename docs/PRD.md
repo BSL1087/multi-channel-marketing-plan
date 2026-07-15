@@ -19,8 +19,8 @@ Marketing-Teams (mehrere gleichberechtigte Nutzer), die parallel auf mehreren Ma
 | P0 (MVP) | Jahreskalender-Übersicht | Planned |
 | P0 (MVP) | Kannibalisierungs-Warnung | Planned |
 | P1 | Monats-Zoom / Tagesansicht | Planned |
-| P1 | Aktivitätsprotokoll (Admin: wer hat was gemacht) | Roadmap |
-| P1 | Logo-Uploads für Marken & Marketplaces | Roadmap |
+| P1 | Aktivitätsprotokoll (wer hat was gemacht) | Planned |
+| P1 | Logo-Uploads für Marken & Marketplaces | Planned |
 
 ## Success Metrics
 - Reduktion zeitgleicher Doppel-Rabattierungen derselben Marke auf verschiedenen Kanälen (Ziel: nahe 0 unbeabsichtigte Überschneidungen)
