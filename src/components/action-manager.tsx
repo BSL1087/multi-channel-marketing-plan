@@ -210,7 +210,7 @@ export function ActionManager({
                   </TableCell>
                   <TableCell className="font-medium">{action.title}</TableCell>
                   <TableCell>
-                    <span className="flex flex-wrap gap-x-3 gap-y-1">
+                    <span className="flex flex-col items-start gap-1">
                       {action.brands.map((brand) => (
                         <span
                           key={brand.id}
