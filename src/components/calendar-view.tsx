@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -10,6 +10,7 @@ import type {
   DiscountAction,
 } from "@/app/tools/multi-channel-marketing/aktionen/actions";
 import {
+  datePx,
   layoutChannel,
   monthColumns,
   formatDate,
@@ -99,6 +100,21 @@ export function CalendarView({
   );
 
   const months = useMemo(() => monthColumns(), []);
+
+  // "Today" marker — resolved after mount (local date, avoids a hydration
+  // mismatch). datePx returns null unless the displayed year is the current
+  // year, so the line only appears when it is meaningful.
+  const [todayIso, setTodayIso] = useState<string | null>(null);
+  useEffect(() => {
+    const d = new Date();
+    setTodayIso(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate(),
+      ).padStart(2, "0")}`,
+    );
+  }, []);
+  const todayPx = todayIso ? datePx(todayIso, year) : null;
+  const todayLeft = todayPx !== null ? pct(todayPx) : null;
 
   // One bar per (action × brand). Multi-brand actions become several segments.
   const segments = useMemo(() => toSegments(actions), [actions]);
@@ -287,6 +303,20 @@ export function CalendarView({
                   {m.label}
                 </button>
               ))}
+              {todayLeft !== null && (
+                <>
+                  <div
+                    className="pointer-events-none absolute top-0 z-20 h-full w-px bg-primary"
+                    style={{ left: todayLeft }}
+                    aria-hidden
+                  />
+                  <div
+                    className="absolute top-1 z-20 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary"
+                    style={{ left: todayLeft }}
+                    title={`Heute: ${todayIso ? formatDate(todayIso) : ""}`}
+                  />
+                </>
+              )}
             </div>
           </div>
 
@@ -354,6 +384,15 @@ export function CalendarView({
                     </Tooltip>
                   </TooltipProvider>
                 ))}
+
+                {/* "Today" marker line (click-through, spans the row) */}
+                {todayLeft !== null && (
+                  <div
+                    className="pointer-events-none absolute top-0 z-10 h-full w-px bg-primary/70"
+                    style={{ left: todayLeft }}
+                    aria-hidden
+                  />
+                )}
               </div>
             </div>
             );
