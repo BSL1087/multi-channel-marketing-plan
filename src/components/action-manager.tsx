@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarPlus, Pencil, Plus, Trash2 } from "lucide-react";
 
 import type { DiscountAction } from "@/app/tools/multi-channel-marketing/aktionen/actions";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -32,6 +33,37 @@ function formatRange(start: string, end: string): string {
     : `${formatDate(start)} – ${formatDate(end)}`;
 }
 
+/** Local calendar date as `YYYY-MM-DD` (matches the DB date format). */
+function localIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+type ActionStatus = "active" | "upcoming" | "expired";
+
+function getStatus(start: string, end: string, todayIso: string): ActionStatus {
+  if (end < todayIso) return "expired";
+  if (start > todayIso) return "upcoming";
+  return "active";
+}
+
+/**
+ * Traffic-light status styling. `dot` colours the left indicator; `row` tints
+ * the whole row (active → light green, expired → dimmed, upcoming → unchanged).
+ */
+const STATUS_META: Record<
+  ActionStatus,
+  { label: string; dot: string; row: string }
+> = {
+  active: { label: "Läuft aktuell", dot: "bg-emerald-500", row: "bg-emerald-500/[0.06]" },
+  upcoming: { label: "Kommt noch", dot: "bg-amber-400", row: "" },
+  expired: { label: "Abgelaufen", dot: "bg-red-400", row: "opacity-60" },
+};
+
+const STATUS_ORDER: ActionStatus[] = ["active", "upcoming", "expired"];
+
 export function ActionManager({
   actions,
   brands,
@@ -44,6 +76,13 @@ export function ActionManager({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<DiscountAction | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DiscountAction | null>(null);
+
+  // Resolved after mount so the status colours use the viewer's local date and
+  // never cause a server/client hydration mismatch.
+  const [todayIso, setTodayIso] = useState<string | null>(null);
+  useEffect(() => {
+    setTodayIso(localIsoDate(new Date()));
+  }, []);
 
   const canCreate = brands.length > 0 && channels.length > 0;
 
@@ -91,10 +130,28 @@ export function ActionManager({
 
   return (
     <div className="mt-6">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          {actions.length} {actions.length === 1 ? "Aktion" : "Aktionen"}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <p className="text-sm text-muted-foreground">
+            {actions.length} {actions.length === 1 ? "Aktion" : "Aktionen"}
+          </p>
+          {actions.length > 0 && (
+            <span className="flex items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {STATUS_ORDER.map((s) => (
+                <span key={s} className="inline-flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "block h-2.5 w-2.5 rounded-full",
+                      STATUS_META[s].dot,
+                    )}
+                    aria-hidden
+                  />
+                  {STATUS_META[s].label}
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
         <Button onClick={openCreate} size="sm">
           <Plus className="h-4 w-4" />
           Aktion hinzufügen
@@ -121,6 +178,9 @@ export function ActionManager({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-px pr-0">
+                  <span className="sr-only">Status</span>
+                </TableHead>
                 <TableHead>Titel</TableHead>
                 <TableHead>Marken</TableHead>
                 <TableHead>Kanal</TableHead>
@@ -130,8 +190,24 @@ export function ActionManager({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {actions.map((action) => (
-                <TableRow key={action.id}>
+              {actions.map((action) => {
+                const status = todayIso
+                  ? getStatus(action.start_date, action.end_date, todayIso)
+                  : null;
+                const meta = status ? STATUS_META[status] : null;
+                return (
+                <TableRow key={action.id} className={meta?.row}>
+                  <TableCell className="w-px pr-0">
+                    <span
+                      className={cn(
+                        "block h-2.5 w-2.5 rounded-full",
+                        meta ? meta.dot : "bg-transparent",
+                      )}
+                      title={meta?.label}
+                      aria-hidden
+                    />
+                    <span className="sr-only">{meta?.label ?? ""}</span>
+                  </TableCell>
                   <TableCell className="font-medium">{action.title}</TableCell>
                   <TableCell>
                     <span className="flex flex-wrap gap-x-3 gap-y-1">
@@ -160,24 +236,27 @@ export function ActionManager({
                   <TableCell className="w-px whitespace-nowrap py-2 text-right">
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
+                      aria-label={`„${action.title}" bearbeiten`}
+                      title="Bearbeiten"
                       onClick={() => openEdit(action)}
                     >
                       <Pencil className="h-4 w-4" />
-                      Bearbeiten
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       className="text-destructive hover:text-destructive"
+                      aria-label={`„${action.title}" löschen`}
+                      title="Löschen"
                       onClick={() => setDeleteTarget(action)}
                     >
                       <Trash2 className="h-4 w-4" />
-                      Löschen
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>
