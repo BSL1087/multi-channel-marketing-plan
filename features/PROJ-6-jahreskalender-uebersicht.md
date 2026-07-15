@@ -64,7 +64,8 @@
 
 ## Open Questions
 <!-- Unresolved questions from the spec interview. Close them in /refine when answered. -->
-- [ ] **Filter** (Produktgruppe/Marke; Marketplace vs. eigener Webshop) als Folge-Feature — der Webshop-Filter braucht ein **Typ-Feld am Kanal** (PROJ-3 erweitern).
+- [x] **Filter Marketplace vs. eigener Webshop** — umgesetzt 2026-07-02 (siehe „Filter Marketplace/Webshop" unten); Kanal erhielt dafür ein `type`-Feld (PROJ-3-Erweiterung).
+- [ ] **Filter Produktgruppe/Marke** — weiterhin offen als Folge-Feature.
 - [ ] Genaue Darstellung sehr kurzer Balken (Mindestbreite/Label) final beim Bau justieren.
 
 ## Decision Log
@@ -229,6 +230,30 @@ Nach mehreren Abstimmungsrunden mit dem Nutzer wurde die Darstellung wie folgt f
 - **Security:** Pass
 - **Production Ready:** YES
 - **Recommendation:** PROJ-6 freigeben. Nächstes: PROJ-8 Monats-Detailansicht (Einstieg per Klick auf den Monat; keine Tagesansicht). Filter (inkl. Marketplace/Webshop-Typ) als weiteres Folge-Feature.
+
+## Filter Marketplace/Webshop (Folge-Feature)
+**Stand:** 2026-07-02
+
+Der im ursprünglichen Scope ausgelagerte Filter „eigene Webshops vs. externe Marketplaces" ist umgesetzt. Er brauchte das im Spec vermerkte **Typ-Feld am Kanal** (PROJ-3-Erweiterung).
+
+**Datenmodell (PROJ-3-Erweiterung):**
+- Migration `add_type_to_marketplaces`: Spalte `marketplaces.type text not null default 'marketplace' check (type in ('marketplace','webshop'))`.
+- Backfill: bestehende Kanäle mit Namen wie `WS%` → `webshop` (Nutzer-Entscheidung), Rest → `marketplace`. Ergebnis: 4 Webshops (WS-*), 6 Marketplaces.
+
+**Kanal-Verwaltung (`/kanaele`):**
+- `channel-validation.ts`: `channelTypeSchema` (`marketplace` | `webshop`) + `CHANNEL_TYPE_LABELS`.
+- Server-Actions: `createChannel(name, type)`; `renameChannel` → **`updateChannel(id, name, type)`** (Name + Typ, abwärts nicht kompatibel — einziger Aufrufer ist der Dialog).
+- `channel-form-dialog.tsx`: RadioGroup „Marketplace / Eigener Webshop"; Titel „Kanal bearbeiten".
+- `channel-manager.tsx`: Typ als Badge je Zeile; Button „Umbenennen" → „Bearbeiten".
+
+**Kalender (Jahresansicht, `calendar-view.tsx`):**
+- Zwei Checkboxen „Eigene Webshops" / „Marketplaces" (beide standardmäßig an, mit Anzahl) blenden die jeweiligen Kanal-Zeilen ein/aus.
+- Legende richtet sich nach den sichtbaren Zeilen; Leerzustand „Kein Kanal entspricht dem Filter", wenn beide deaktiviert sind.
+- Serverseitig lädt die Seite `marketplaces.type` mit; Filter läuft rein clientseitig (keine zusätzliche Abfrage).
+
+**Nicht enthalten:** Filter für die Monats-Detailansicht (PROJ-8) und Produktgruppen-/Marken-Filter bleiben offen.
+
+**Verifikation:** `tsc --noEmit` ✓, `next build` ✓, `npm test` (58 Tests) ✓.
 
 ## Deployment
 _To be added by /deploy_

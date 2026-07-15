@@ -16,6 +16,8 @@ import {
   TRACK_WIDTH,
 } from "@/lib/calendar-layout";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
@@ -23,8 +25,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ActionFormDialog } from "@/components/action-form-dialog";
+import type { ChannelType } from "@/lib/channel-validation";
 
-type Option = { id: string; name: string };
+type Option = { id: string; name: string; type: ChannelType };
 type BrandOption = {
   id: string;
   name: string;
@@ -90,14 +93,41 @@ export function CalendarView({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<DiscountAction | null>(null);
 
+  // Channel-type filter (PROJ-3 extension): show own webshops and/or marketplaces.
+  const [visibleTypes, setVisibleTypes] = useState<Record<ChannelType, boolean>>(
+    { webshop: true, marketplace: true },
+  );
+
   const months = useMemo(() => monthColumns(), []);
 
   // One bar per (action × brand). Multi-brand actions become several segments.
   const segments = useMemo(() => toSegments(actions), [actions]);
 
-  // Colour legend: brands that appear in the displayed year, grouped by product group.
+  // Rows to render = channels whose type is currently enabled in the filter.
+  const visibleChannels = useMemo(
+    () => channels.filter((c) => visibleTypes[c.type]),
+    [channels, visibleTypes],
+  );
+
+  // Segments that fall in a currently visible channel — drives the legend.
+  const visibleSegments = useMemo(() => {
+    const visibleIds = new Set(visibleChannels.map((c) => c.id));
+    return segments.filter((s) => visibleIds.has(s.action.marketplace_id));
+  }, [segments, visibleChannels]);
+
+  const counts = useMemo(() => {
+    let webshop = 0;
+    let marketplace = 0;
+    for (const c of channels) {
+      if (c.type === "webshop") webshop++;
+      else marketplace++;
+    }
+    return { webshop, marketplace };
+  }, [channels]);
+
+  // Colour legend: brands that appear in the visible rows, grouped by product group.
   const legend = useMemo(() => {
-    const present = new Set(segments.map((s) => s.brand.id));
+    const present = new Set(visibleSegments.map((s) => s.brand.id));
     const groups = new Map<string, BrandOption[]>();
     for (const b of brands) {
       if (!present.has(b.id)) continue;
@@ -111,10 +141,10 @@ export function CalendarView({
         items: items.sort((a, b) => a.name.localeCompare(b.name, "de")),
       }))
       .sort((a, b) => a.group.localeCompare(b.group, "de"));
-  }, [segments, brands]);
+  }, [visibleSegments, brands]);
 
-  // Group segments by channel, then lay each channel out into stacked lanes
-  // (keyed by brand, so one brand's non-overlapping bars line up on one track).
+  // Group segments by channel, then lay each visible channel out into stacked
+  // lanes (keyed by brand, so one brand's non-overlapping bars line up).
   const byChannel = useMemo(() => {
     const map = new Map<string, ActionSegment[]>();
     for (const s of segments) {
@@ -122,11 +152,11 @@ export function CalendarView({
       list.push(s);
       map.set(s.action.marketplace_id, list);
     }
-    return channels.map((c) => ({
+    return visibleChannels.map((c) => ({
       channel: c,
       layout: layoutChannel(map.get(c.id) ?? [], year, (s) => s.brand.id),
     }));
-  }, [segments, channels, year]);
+  }, [segments, visibleChannels, year]);
 
   function openCreate() {
     setEditing(null);
@@ -186,13 +216,54 @@ export function CalendarView({
         </Button>
       </div>
 
-      {actions.length === 0 && (
+      {/* Channel-type filter: toggle own webshops vs. external marketplaces. */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+        <span className="text-sm font-medium text-muted-foreground">
+          Anzeigen:
+        </span>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="filter-webshop"
+            checked={visibleTypes.webshop}
+            onCheckedChange={(v) =>
+              setVisibleTypes((prev) => ({ ...prev, webshop: v === true }))
+            }
+          />
+          <Label htmlFor="filter-webshop" className="font-normal">
+            Eigene Webshops{" "}
+            <span className="text-muted-foreground">({counts.webshop})</span>
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="filter-marketplace"
+            checked={visibleTypes.marketplace}
+            onCheckedChange={(v) =>
+              setVisibleTypes((prev) => ({ ...prev, marketplace: v === true }))
+            }
+          />
+          <Label htmlFor="filter-marketplace" className="font-normal">
+            Marketplaces{" "}
+            <span className="text-muted-foreground">({counts.marketplace})</span>
+          </Label>
+        </div>
+      </div>
+
+      {visibleChannels.length === 0 ? (
         <p className="mt-4 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          Keine Aktionen in {year}. Lege eine Aktion an oder wechsle das Jahr.
+          Kein Kanal entspricht dem Filter. Aktiviere oben mindestens einen
+          Kanal-Typ.
         </p>
+      ) : (
+        actions.length === 0 && (
+          <p className="mt-4 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            Keine Aktionen in {year}. Lege eine Aktion an oder wechsle das Jahr.
+          </p>
+        )
       )}
 
       {/* Calendar grid (horizontally scrollable on small screens) */}
+      {visibleChannels.length > 0 && (
       <div className="mt-4 overflow-x-auto rounded-lg border bg-background">
         <div className="min-w-[820px]">
           {/* Month axis */}
@@ -289,6 +360,7 @@ export function CalendarView({
           })}
         </div>
       </div>
+      )}
 
       {/* Colour legend, grouped by product group */}
       {legend.length > 0 && (

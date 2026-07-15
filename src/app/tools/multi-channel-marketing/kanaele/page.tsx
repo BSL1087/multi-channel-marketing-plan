@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ChannelManager } from "@/components/channel-manager";
+import type { Channel } from "./actions";
 
 export default async function ChannelsPage() {
   const supabase = await createClient();
@@ -19,8 +20,9 @@ export default async function ChannelsPage() {
 
   const { data: channels } = await supabase
     .from("marketplaces")
-    .select("id, name")
-    .order("name", { ascending: true });
+    .select("id, name, type")
+    .order("name", { ascending: true })
+    .returns<Channel[]>();
 
   return (
     <div className="min-h-screen bg-secondary/40">

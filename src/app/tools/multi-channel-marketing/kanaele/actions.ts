@@ -5,12 +5,14 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   channelNameSchema,
+  channelTypeSchema,
   isDuplicateName,
+  type ChannelType,
 } from "@/lib/channel-validation";
 
 const PATH = "/tools/multi-channel-marketing/kanaele";
 
-export type Channel = { id: string; name: string };
+export type Channel = { id: string; name: string; type: ChannelType };
 
 export type ChannelActionResult =
   | { ok: true }
@@ -20,12 +22,19 @@ const DUPLICATE_MESSAGE = "Es gibt bereits einen Kanal mit diesem Namen.";
 
 export async function createChannel(
   rawName: string,
+  rawType: string,
 ): Promise<ChannelActionResult> {
   const parsed = channelNameSchema.safeParse(rawName);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
   }
   const name = parsed.data;
+
+  const parsedType = channelTypeSchema.safeParse(rawType);
+  if (!parsedType.success) {
+    return { ok: false, message: parsedType.error.issues[0].message };
+  }
+  const type = parsedType.data;
 
   const supabase = await createClient();
   const {
@@ -45,7 +54,7 @@ export async function createChannel(
     return { ok: false, message: DUPLICATE_MESSAGE, duplicate: true };
   }
 
-  const { error } = await supabase.from("marketplaces").insert({ name });
+  const { error } = await supabase.from("marketplaces").insert({ name, type });
   if (error) {
     // 23505 = unique_violation — last line of defence against a race.
     if (error.code === "23505") {
@@ -58,15 +67,22 @@ export async function createChannel(
   return { ok: true };
 }
 
-export async function renameChannel(
+export async function updateChannel(
   id: string,
   rawName: string,
+  rawType: string,
 ): Promise<ChannelActionResult> {
   const parsed = channelNameSchema.safeParse(rawName);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
   }
   const name = parsed.data;
+
+  const parsedType = channelTypeSchema.safeParse(rawType);
+  if (!parsedType.success) {
+    return { ok: false, message: parsedType.error.issues[0].message };
+  }
+  const type = parsedType.data;
 
   const supabase = await createClient();
   const {
@@ -88,14 +104,14 @@ export async function renameChannel(
 
   const { data: updated, error } = await supabase
     .from("marketplaces")
-    .update({ name })
+    .update({ name, type })
     .eq("id", id)
     .select("id");
   if (error) {
     if (error.code === "23505") {
       return { ok: false, message: DUPLICATE_MESSAGE, duplicate: true };
     }
-    return { ok: false, message: "Kanal konnte nicht umbenannt werden." };
+    return { ok: false, message: "Kanal konnte nicht gespeichert werden." };
   }
   if (!updated || updated.length === 0) {
     return { ok: false, message: "Dieser Kanal existiert nicht mehr." };
