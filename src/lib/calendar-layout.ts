@@ -150,8 +150,8 @@ export function layoutChannel<T extends CalendarItem>(
   return { lanes: Math.max(lanes.length, 1), items: result };
 }
 
-/** Days of axis the "weitere anzeigen" label claims while lanes are packed. */
-const CHIP_RESERVE_DAYS = 48; // ≈96px at DAY_WIDTH — the label is wider than a short action
+/** Days of axis the "mehr zeigen" label claims while lanes are packed. */
+const CHIP_RESERVE_DAYS = 40; // ≈80px at DAY_WIDTH — the label is wider than a short action
 
 /** Placement of one "weitere anzeigen" toggle, anchored at its action. */
 export type ChipPlacement = {
