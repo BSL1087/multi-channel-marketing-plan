@@ -260,18 +260,33 @@ Der im ursprünglichen Scope ausgelagerte Filter „eigene Webshops vs. externe 
 
 **Problem:** Zeilen mit vielen parallelen Aktionen wurden sehr hoch (z.B. Kaufland im Juni: 6 Spuren), obwohl die Aktionen längst gelaufen waren.
 
-**Lösung:** Abgelaufene Aktionen (`end_date < heute`) werden je Kanal-Zeile eingeklappt; eine Spur bleibt für den Umschalter „+N vergangene" reserviert.
+### Erster Versuch (verworfen)
 
-- `calendar-layout.ts`: neue reine Funktion **`layoutChannelCollapsible(items, year, { cutoff, expanded, baseLanes, getGroup })`** → `{ layout, lanes, toggleLane, past, anchorPx }`.
-- **Eingeklappt wird nur, wenn es wirklich Höhe spart:** die Zeile muss `baseLanes` (3) überschreiten *und* die vergangenen Balken müssen mehr Spuren freigeben, als die Umschalter-Spur kostet. Kompakte Zeilen zeigen ihre Historie weiterhin vollständig.
-- `cutoff = null` (Nutzer betrachtet ein vergangenes Jahr) deaktiviert das Einklappen komplett — sonst wäre dort alles „vergangen" und jede Zeile leer.
-- `calendar-view.tsx`: Zustand `expandedChannels` (Set von Kanal-IDs); Chip als Button in der letzten Spur, positioniert am frühesten eingeklappten Balken (rechts angeschlagen, falls er sonst über den Dezember hinausragt). Label zählt **Aktionen**, nicht Balken (eine Aktion mit 3 Marken = 3 Balken).
-- Aufgeklappt zeigt die Zeile alles wie zuvor, plus Umschalter-Spur („−N vergangene").
-- Legende bleibt unverändert (Jahresdaten, unabhängig vom Einklappen).
+Zuerst wurden **ganze vergangene Aktionen** ausgeblendet und durch einen Chip „+N vergangene" ersetzt. Nach dem Deploy vom Nutzer abgelehnt: die Kaufland-Aktionen im Mai verschwanden mit, obwohl sie mit 1 bzw. 3 Marken problemlos in die Standardhöhe passen. Die Zahl im Label war ebenfalls unerwünscht.
 
-**Nicht enthalten:** Die Monats-Detailansicht (PROJ-8) klappt nicht ein — dort ist nur ein Monat sichtbar, die Zeilen bleiben flach.
+### Umgesetzte Lösung
 
-**Verifikation:** `tsc --noEmit` ✓, `next build` ✓, `npm test` (65 Tests, davon 7 neu in `src/lib/calendar-layout.test.ts`) ✓.
+Die Einheit ist die **Marke**, nicht der Aktionszeitraum — eine Aktion mit vielen Marken macht die Zeile hoch, nicht die Anzahl der Aktionen.
+
+- Eine **vergangene** Aktion (`end_date < heute`) mit **mehr als 3 Marken** zeigt nur die ersten 2 Marken (alphabetisch) plus einen Umschalter „weitere anzeigen" in der dritten Spur.
+- Aktionen mit bis zu 3 Marken bleiben vollständig — sie passen bereits in die Standardhöhe.
+- **Laufende und geplante Aktionen werden nie gekürzt** (Nutzer-Entscheidung 2026-08-21), egal wie viele Marken sie haben. WS-Family's World (Summer-Sale, 5 Marken, läuft bis 23.08.) bleibt also 5 Spuren hoch.
+- Ein Klick klappt die **ganze Kanal-Zeile** auf (Nutzer-Entscheidung), nicht nur die eine Aktion; der Chip wird dann zu „weniger anzeigen".
+
+**Technisch:**
+
+- `calendar-layout.ts`: **`layoutChannelCollapsible(items, year, { cutoff, expanded, baseLanes, getGroup, getActionId, getSortKey })`** → `{ items, chips, lanes }`.
+- Balken und Chips werden **gemeinsam** durch `layoutChannel` gepackt. Dadurch kann ein Chip nie auf einem Balken landen, und die Zeilenhöhe ergibt sich automatisch.
+- Der Chip reserviert `CHIP_RESERVE_DAYS = 48` Tage Achsenbreite (≈96px), weil das Label breiter ist als eine kurze Aktion — sonst könnte ein späterer Balken derselben Spur darunter laufen.
+- Der Chip bekommt eine eindeutige Gruppe (`chip:<actionId>`), damit die Marken-Affinität der Spuren ihn nie wiederverwendet.
+- `cutoff = null` deaktiviert das Kürzen. Anders als beim ersten Versuch gibt es **keine** Sonderbehandlung für vergangene Jahre: es verschwindet nie eine ganze Aktion, jede behält 2 sichtbare Marken.
+- `calendar-view.tsx`: Zustand `expandedChannels` (Set von Kanal-IDs); ein Chip je gekürzter Aktion, am linken Rand dieser Aktion verankert (rechts angeschlagen, falls er sonst über den Dezember hinausragt).
+
+**Ergebnis für die Echtdaten (geprüft per Supabase-MCP):** Kaufland fällt von 6 auf 3 Spuren — Mai bleibt vollständig sichtbar (1 bzw. 3 Marken), nur die Sparfuchswoche im Juni (6 Marken) wird auf Dooky + Fit Kidz plus Chip gekürzt. Amazon, Decathlon, Otto und WS-Family's World bleiben unverändert.
+
+**Nicht enthalten:** Die Monats-Detailansicht (PROJ-8) kürzt nicht — dort ist nur ein Monat sichtbar, die Zeilen bleiben flach.
+
+**Verifikation:** `tsc --noEmit` ✓, `next build` ✓, `npm test` (66 Tests, davon 8 in `src/lib/calendar-layout.test.ts`) ✓.
 
 ## Deployment
 _To be added by /deploy_

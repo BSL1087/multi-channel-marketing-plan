@@ -150,28 +150,47 @@ export function layoutChannel<T extends CalendarItem>(
   return { lanes: Math.max(lanes.length, 1), items: result };
 }
 
-export type CollapsibleLayout<T> = {
-  /** The layout actually rendered (without the past items while collapsed). */
-  layout: ChannelLayout<T>;
-  /** Total lanes the row must be sized for, including the toggle lane. */
-  lanes: number;
-  /** Lane index of the "+N vergangene" toggle, or null when there is none. */
-  toggleLane: number | null;
-  /** Past items behind the toggle — empty when the row is not collapsible. */
-  past: T[];
-  /** Pixel x where the earliest past item starts (anchors the toggle). */
-  anchorPx: number;
+/** Days of axis the "weitere anzeigen" label claims while lanes are packed. */
+const CHIP_RESERVE_DAYS = 48; // ≈96px at DAY_WIDTH — the label is wider than a short action
+
+/** Placement of one "weitere anzeigen" toggle, anchored at its action. */
+export type ChipPlacement = {
+  actionId: string;
+  leftPx: number;
+  lane: number;
 };
 
+export type CollapsibleLayout<T> = {
+  /** Bars to render, already assigned to lanes. */
+  items: LaidOutItem<T>[];
+  /** Toggles to render — one per truncated action. */
+  chips: ChipPlacement[];
+  /** Total lanes the row must be sized for (bars and chips share the space). */
+  lanes: number;
+};
+
+/** ISO date shifted by `days`, used to reserve axis width for a chip label. */
+function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    t.getUTCDate(),
+  ).padStart(2, "0")}`;
+}
+
 /**
- * Channel layout that folds finished actions away so a busy row shrinks back to
- * its default height.
+ * Channel layout that truncates finished actions so a busy row keeps its
+ * default height.
  *
- * A row only collapses when folding actually pays off: the past bars have to
- * free more lanes than the toggle lane costs, and the row has to exceed
- * `baseLanes` in the first place — an already compact row keeps showing its
- * history. `cutoff` is today's ISO date, or null to disable collapsing entirely
- * (browsing a past year, where everything would be "past").
+ * The unit is the BRAND, not the action: one action with many brands is what
+ * makes a row tall, so a past action with more than `baseLanes` brands shows
+ * only `baseLanes - 1` of them plus a toggle in the next lane. An action with
+ * few brands stays complete — it already fits. Running and planned actions are
+ * never truncated, however many brands they carry.
+ *
+ * `expanded` (row level) puts every brand back and turns the toggles into
+ * "collapse again" controls. `cutoff` is today's ISO date; null disables
+ * truncation entirely.
  */
 export function layoutChannelCollapsible<T extends CalendarItem>(
   items: T[],
@@ -181,57 +200,80 @@ export function layoutChannelCollapsible<T extends CalendarItem>(
     expanded = false,
     baseLanes = 3,
     getGroup,
+    getActionId,
+    getSortKey,
   }: {
     cutoff: string | null;
     expanded?: boolean;
     baseLanes?: number;
-    getGroup?: (item: T) => string;
+    getGroup: (item: T) => string;
+    getActionId: (item: T) => string;
+    getSortKey: (item: T) => string;
   },
 ): CollapsibleLayout<T> {
-  const full = layoutChannel(items, year, getGroup);
-  const uncollapsed: CollapsibleLayout<T> = {
-    layout: full,
-    lanes: full.lanes,
-    toggleLane: null,
-    past: [],
-    anchorPx: 0,
-  };
-  if (!cutoff || full.lanes <= baseLanes) return uncollapsed;
-
-  // Only items that actually render in this year can free up a lane.
-  const leftPx = new Map<string, number>();
+  // One bar per brand; group them back into the actions they came from.
+  const byAction = new Map<string, T[]>();
   for (const item of items) {
-    const g = barGeometry(item, year);
-    if (g) leftPx.set(item.id, g.leftPx);
+    const id = getActionId(item);
+    const list = byAction.get(id) ?? [];
+    list.push(item);
+    byAction.set(id, list);
   }
-  const past = items.filter(
-    (i) => leftPx.has(i.id) && i.end_date < cutoff,
-  );
-  if (past.length === 0) return uncollapsed;
 
-  const pastIds = new Set(past.map((i) => i.id));
-  const rest = items.filter((i) => !pastIds.has(i.id));
-  const restLayout = layoutChannel(rest, year, getGroup);
-  const restLanes = rest.length > 0 ? restLayout.lanes : 0;
-  if (restLanes + 1 >= full.lanes) return uncollapsed; // no height won
+  // Bars and chips are packed together, so a chip can never land on a bar.
+  type Packed = CalendarItem & {
+    g: string;
+    bar?: T;
+    chipFor?: string;
+  };
+  const packables: Packed[] = [];
 
-  const anchorPx = Math.min(...past.map((i) => leftPx.get(i.id) as number));
+  for (const [actionId, segs] of byAction) {
+    // All bars of an action share its date range, so one segment decides.
+    const isPast = cutoff !== null && segs[0].end_date < cutoff;
+    const truncatable = isPast && segs.length > baseLanes;
 
-  return expanded
-    ? {
-        layout: full,
-        lanes: full.lanes + 1,
-        toggleLane: full.lanes,
-        past,
-        anchorPx,
-      }
-    : {
-        layout: restLayout,
-        lanes: Math.max(restLanes + 1, 1),
-        toggleLane: restLanes,
-        past,
-        anchorPx,
-      };
+    const shown =
+      truncatable && !expanded
+        ? [...segs]
+            .sort((a, b) => getSortKey(a).localeCompare(getSortKey(b), "de"))
+            .slice(0, baseLanes - 1)
+        : segs;
+
+    for (const s of shown) {
+      packables.push({
+        id: s.id,
+        start_date: s.start_date,
+        end_date: s.end_date,
+        g: getGroup(s),
+        bar: s,
+      });
+    }
+
+    if (truncatable) {
+      packables.push({
+        id: `chip:${actionId}`,
+        start_date: segs[0].start_date,
+        end_date: addDays(segs[0].end_date, CHIP_RESERVE_DAYS),
+        g: `chip:${actionId}`, // unique, so lane affinity never reuses it
+        chipFor: actionId,
+      });
+    }
+  }
+
+  const packed = layoutChannel(packables, year, (p) => p.g);
+
+  const laidOutItems: LaidOutItem<T>[] = [];
+  const chips: ChipPlacement[] = [];
+  for (const { item, leftPx, widthPx, lane } of packed.items) {
+    if (item.bar) {
+      laidOutItems.push({ item: item.bar, leftPx, widthPx, lane });
+    } else if (item.chipFor) {
+      chips.push({ actionId: item.chipFor, leftPx, lane });
+    }
+  }
+
+  return { items: laidOutItems, chips, lanes: packed.lanes };
 }
 
 /**

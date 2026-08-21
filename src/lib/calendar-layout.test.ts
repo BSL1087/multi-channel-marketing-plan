@@ -1,120 +1,149 @@
 import { describe, it, expect } from "vitest";
 
-import { layoutChannel, layoutChannelCollapsible } from "./calendar-layout";
+import { layoutChannelCollapsible } from "./calendar-layout";
 
-type Item = { id: string; start_date: string; end_date: string; brand: string };
+/** One bar = one brand of one action, mirroring the calendar's segments. */
+type Seg = {
+  id: string;
+  start_date: string;
+  end_date: string;
+  action: string;
+  brand: string;
+};
 
-/** n items sharing a time range, each on its own brand → n stacked lanes. */
-function stack(prefix: string, from: string, to: string, n: number): Item[] {
-  return Array.from({ length: n }, (_, i) => ({
-    id: `${prefix}${i}`,
+/** An action with `brands` brands — each brand becomes its own bar. */
+function action(
+  name: string,
+  from: string,
+  to: string,
+  brands: string[],
+): Seg[] {
+  return brands.map((brand) => ({
+    id: `${name}:${brand}`,
     start_date: from,
     end_date: to,
-    brand: `${prefix}-brand-${i}`,
+    action: name,
+    brand,
   }));
 }
 
-const byBrand = (i: Item) => i.brand;
-const TODAY = "2026-08-21";
+const opts = {
+  cutoff: "2026-08-21",
+  getGroup: (s: Seg) => s.brand,
+  getActionId: (s: Seg) => s.action,
+  getSortKey: (s: Seg) => s.brand,
+};
+
+const SIX = ["Dooky", "Fit Kidz", "Haakaa", "Prfrm", "RPM", "Wolverson"];
 
 describe("layoutChannelCollapsible", () => {
-  it("leaves a row untouched when it fits the base height", () => {
-    const items = stack("p", "2026-05-01", "2026-05-20", 3);
-    const row = layoutChannelCollapsible(items, 2026, {
-      cutoff: TODAY,
-      getGroup: byBrand,
-    });
+  it("keeps a past action complete when its brands fit the base height", () => {
+    const items = action("kampagne", "2026-05-14", "2026-05-17", [
+      "Prfrm",
+      "RPM",
+      "Wolverson",
+    ]);
+    const row = layoutChannelCollapsible(items, 2026, opts);
 
     expect(row.lanes).toBe(3);
-    expect(row.toggleLane).toBeNull();
-    expect(row.past).toEqual([]);
-    expect(row.layout.items).toHaveLength(3);
+    expect(row.chips).toEqual([]);
+    expect(row.items).toHaveLength(3);
   });
 
-  it("folds past bars away and shrinks a tall row to the toggle lane", () => {
-    const items = stack("p", "2026-06-01", "2026-06-20", 6);
-    const row = layoutChannelCollapsible(items, 2026, {
-      cutoff: TODAY,
-      getGroup: byBrand,
-    });
+  it("truncates a past action with too many brands to 2 bars plus a toggle", () => {
+    const items = action("sparfuchs", "2026-06-04", "2026-06-10", SIX);
+    const row = layoutChannelCollapsible(items, 2026, opts);
 
-    expect(layoutChannel(items, 2026, byBrand).lanes).toBe(6);
-    expect(row.lanes).toBe(1); // nothing left to draw — just the toggle
-    expect(row.toggleLane).toBe(0);
-    expect(row.past).toHaveLength(6);
-    expect(row.layout.items).toEqual([]);
+    expect(row.items.map((i) => i.item.brand)).toEqual(["Dooky", "Fit Kidz"]);
+    expect(row.chips).toHaveLength(1);
+    expect(row.chips[0].actionId).toBe("sparfuchs");
+    expect(row.chips[0].lane).toBe(2); // the third lane holds the toggle
+    expect(row.lanes).toBe(3); // standard height
   });
 
-  it("keeps running and upcoming bars visible above the toggle", () => {
-    const items = [
-      ...stack("p", "2026-06-01", "2026-06-20", 4), // done
-      ...stack("f", "2026-09-01", "2026-09-20", 2), // upcoming
-    ];
-    const row = layoutChannelCollapsible(items, 2026, {
-      cutoff: TODAY,
-      getGroup: byBrand,
-    });
+  it("never truncates a running or planned action, however many brands", () => {
+    // Ends after the cutoff, so it is still running.
+    const items = action("summer-sale", "2026-07-09", "2026-08-23", [
+      ...SIX,
+      "Tega",
+    ]);
+    const row = layoutChannelCollapsible(items, 2026, opts);
 
-    expect(row.lanes).toBe(3); // 2 upcoming lanes + toggle lane
-    expect(row.toggleLane).toBe(2);
-    expect(row.layout.items.map((i) => i.item.id)).toEqual(["f0", "f1"]);
-  });
-
-  it("does not fold when the toggle lane would not save height", () => {
-    const items = [
-      ...stack("p", "2026-06-01", "2026-06-20", 1), // one past lane
-      ...stack("f", "2026-09-01", "2026-09-20", 4), // four upcoming lanes
-    ];
-    const row = layoutChannelCollapsible(items, 2026, {
-      cutoff: TODAY,
-      getGroup: byBrand,
-    });
-
-    // The lone June bar shares a lane with a September one, so folding it away
-    // would swap one lane for the toggle lane and win nothing.
-    expect(row.toggleLane).toBeNull();
-    expect(row.lanes).toBe(4);
-    expect(row.layout.items).toHaveLength(5);
-  });
-
-  it("shows everything again when expanded, plus the toggle lane", () => {
-    const items = stack("p", "2026-06-01", "2026-06-20", 6);
-    const row = layoutChannelCollapsible(items, 2026, {
-      cutoff: TODAY,
-      expanded: true,
-      getGroup: byBrand,
-    });
-
+    expect(row.chips).toEqual([]);
+    expect(row.items).toHaveLength(7);
     expect(row.lanes).toBe(7);
-    expect(row.toggleLane).toBe(6);
-    expect(row.layout.items).toHaveLength(6);
-    expect(row.past).toHaveLength(6);
   });
 
-  it("never folds without a cutoff (past years stay fully expanded)", () => {
-    const items = stack("p", "2026-06-01", "2026-06-20", 6);
+  it("keeps the row at base height when a small and a big past action share it", () => {
+    // The real Kaufland row: May fits, June is truncated, both stay visible.
+    const items = [
+      ...action("angebot", "2026-05-01", "2026-05-06", ["Happy Hands"]),
+      ...action("kampagne", "2026-05-14", "2026-05-17", [
+        "Prfrm",
+        "RPM",
+        "Wolverson",
+      ]),
+      ...action("sparfuchs", "2026-06-04", "2026-06-10", SIX),
+      ...action("steelstorm", "2026-08-15", "2026-08-31", ["Steelstorm"]),
+    ];
+    const row = layoutChannelCollapsible(items, 2026, opts);
+
+    expect(row.lanes).toBe(3);
+    expect(row.chips).toHaveLength(1);
+    // May keeps all three brands, June keeps two, August is untouched.
+    const shown = row.items.filter((i) => i.item.action === "kampagne");
+    expect(shown).toHaveLength(3);
+    expect(
+      row.items.filter((i) => i.item.action === "sparfuchs"),
+    ).toHaveLength(2);
+    expect(
+      row.items.filter((i) => i.item.action === "steelstorm"),
+    ).toHaveLength(1);
+  });
+
+  it("puts every brand back when the row is expanded, toggle included", () => {
+    const items = action("sparfuchs", "2026-06-04", "2026-06-10", SIX);
     const row = layoutChannelCollapsible(items, 2026, {
-      cutoff: null,
-      getGroup: byBrand,
+      ...opts,
+      expanded: true,
     });
 
-    expect(row.toggleLane).toBeNull();
+    expect(row.items).toHaveLength(6);
+    expect(row.chips).toHaveLength(1);
+    expect(row.lanes).toBe(7); // 6 brands + the "weniger anzeigen" lane
+  });
+
+  it("truncates nothing without a cutoff", () => {
+    const items = action("sparfuchs", "2026-06-04", "2026-06-10", SIX);
+    const row = layoutChannelCollapsible(items, 2026, {
+      ...opts,
+      cutoff: null,
+    });
+
+    expect(row.chips).toEqual([]);
+    expect(row.items).toHaveLength(6);
     expect(row.lanes).toBe(6);
   });
 
-  it("anchors the toggle at the earliest folded bar", () => {
+  it("anchors the toggle at its own action, not at the row start", () => {
     const items = [
-      ...stack("a", "2026-03-01", "2026-03-10", 2),
-      ...stack("b", "2026-06-01", "2026-06-20", 4),
+      ...action("maerz", "2026-03-01", "2026-03-10", ["Happy Hands"]),
+      ...action("sparfuchs", "2026-06-04", "2026-06-10", SIX),
     ];
-    const row = layoutChannelCollapsible(items, 2026, {
-      cutoff: TODAY,
-      getGroup: byBrand,
-    });
+    const row = layoutChannelCollapsible(items, 2026, opts);
 
-    const march = layoutChannel(items, 2026, byBrand).items.find(
-      (i) => i.item.id === "a0",
-    );
-    expect(row.anchorPx).toBe(march?.leftPx);
+    const juneBar = row.items.find((i) => i.item.action === "sparfuchs");
+    expect(row.chips[0].leftPx).toBe(juneBar?.leftPx);
+  });
+
+  it("gives two truncated actions their own toggle", () => {
+    const items = [
+      ...action("a", "2026-02-02", "2026-02-08", SIX),
+      ...action("b", "2026-06-04", "2026-06-10", SIX),
+    ];
+    const row = layoutChannelCollapsible(items, 2026, opts);
+
+    expect(row.chips.map((c) => c.actionId).sort()).toEqual(["a", "b"]);
+    expect(row.lanes).toBe(3);
   });
 });
