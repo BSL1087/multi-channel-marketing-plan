@@ -150,8 +150,8 @@ export function layoutChannel<T extends CalendarItem>(
   return { lanes: Math.max(lanes.length, 1), items: result };
 }
 
-/** Days of axis the "mehr zeigen" label claims while lanes are packed. */
-const CHIP_RESERVE_DAYS = 40; // ≈80px at DAY_WIDTH — the label is wider than a short action
+/** Days of axis the "mehr" label claims while lanes are packed. */
+const CHIP_RESERVE_DAYS = 22; // ≈44px at DAY_WIDTH — the label is wider than a short action
 
 /** Placement of one "weitere anzeigen" toggle, anchored at its action. */
 export type ChipPlacement = {
@@ -170,7 +170,7 @@ export type CollapsibleLayout<T> = {
 };
 
 /** ISO date shifted by `days`, used to reserve axis width for a chip label. */
-function addDays(iso: string, days: number): string {
+export function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const t = new Date(Date.UTC(y, m - 1, d + days));
   return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(

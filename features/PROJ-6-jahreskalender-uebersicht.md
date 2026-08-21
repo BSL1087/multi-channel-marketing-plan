@@ -273,7 +273,7 @@ Die Einheit ist die **Marke**, nicht der Aktionszeitraum — eine Aktion mit vie
 - **Laufende und geplante Aktionen werden nie gekürzt** (Nutzer-Entscheidung 2026-08-21), egal wie viele Marken sie haben. WS-Family's World (Summer-Sale, 5 Marken, läuft bis 23.08.) bleibt also 5 Spuren hoch.
 - Ein Klick klappt die **ganze Kanal-Zeile** auf (Nutzer-Entscheidung), nicht nur die eine Aktion; der Umschalter wird dann zu „weniger zeigen".
 
-**Darstellung des Umschalters (Nutzer-Entscheidung 2026-08-21):** Zuerst als Pille mit Rahmen und Füllung umgesetzt — wirkte „reingequetscht", weil sie mit 14px höher war als die Spur (13,3px) und als schwerstes Element der Zeile die eigentlichen Daten übertönte. Jetzt **reiner Text ohne Box**: kleine graue Schrift mit Chevron, 12px hoch, Hover unterstreicht. Label von „weitere anzeigen" auf „mehr zeigen" gekürzt (`CHIP_RESERVE_DAYS` entsprechend 48 → 40).
+**Darstellung des Umschalters (Nutzer-Entscheidung 2026-08-21):** Zuerst als Pille mit Rahmen und Füllung umgesetzt — wirkte „reingequetscht", weil sie mit 14px höher war als die Spur (13,3px) und als schwerstes Element der Zeile die eigentlichen Daten übertönte. Jetzt **reiner Text ohne Box**: kleine graue Schrift mit Chevron, 12px hoch, Hover unterstreicht. Label in zwei Schritten gekürzt: „weitere anzeigen" → „mehr zeigen" → **„mehr"** / „weniger" (`CHIP_RESERVE_DAYS` entsprechend 48 → 40 → 22).
 
 **Technisch:**
 
