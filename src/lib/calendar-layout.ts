@@ -150,6 +150,90 @@ export function layoutChannel<T extends CalendarItem>(
   return { lanes: Math.max(lanes.length, 1), items: result };
 }
 
+export type CollapsibleLayout<T> = {
+  /** The layout actually rendered (without the past items while collapsed). */
+  layout: ChannelLayout<T>;
+  /** Total lanes the row must be sized for, including the toggle lane. */
+  lanes: number;
+  /** Lane index of the "+N vergangene" toggle, or null when there is none. */
+  toggleLane: number | null;
+  /** Past items behind the toggle — empty when the row is not collapsible. */
+  past: T[];
+  /** Pixel x where the earliest past item starts (anchors the toggle). */
+  anchorPx: number;
+};
+
+/**
+ * Channel layout that folds finished actions away so a busy row shrinks back to
+ * its default height.
+ *
+ * A row only collapses when folding actually pays off: the past bars have to
+ * free more lanes than the toggle lane costs, and the row has to exceed
+ * `baseLanes` in the first place — an already compact row keeps showing its
+ * history. `cutoff` is today's ISO date, or null to disable collapsing entirely
+ * (browsing a past year, where everything would be "past").
+ */
+export function layoutChannelCollapsible<T extends CalendarItem>(
+  items: T[],
+  year: number,
+  {
+    cutoff,
+    expanded = false,
+    baseLanes = 3,
+    getGroup,
+  }: {
+    cutoff: string | null;
+    expanded?: boolean;
+    baseLanes?: number;
+    getGroup?: (item: T) => string;
+  },
+): CollapsibleLayout<T> {
+  const full = layoutChannel(items, year, getGroup);
+  const uncollapsed: CollapsibleLayout<T> = {
+    layout: full,
+    lanes: full.lanes,
+    toggleLane: null,
+    past: [],
+    anchorPx: 0,
+  };
+  if (!cutoff || full.lanes <= baseLanes) return uncollapsed;
+
+  // Only items that actually render in this year can free up a lane.
+  const leftPx = new Map<string, number>();
+  for (const item of items) {
+    const g = barGeometry(item, year);
+    if (g) leftPx.set(item.id, g.leftPx);
+  }
+  const past = items.filter(
+    (i) => leftPx.has(i.id) && i.end_date < cutoff,
+  );
+  if (past.length === 0) return uncollapsed;
+
+  const pastIds = new Set(past.map((i) => i.id));
+  const rest = items.filter((i) => !pastIds.has(i.id));
+  const restLayout = layoutChannel(rest, year, getGroup);
+  const restLanes = rest.length > 0 ? restLayout.lanes : 0;
+  if (restLanes + 1 >= full.lanes) return uncollapsed; // no height won
+
+  const anchorPx = Math.min(...past.map((i) => leftPx.get(i.id) as number));
+
+  return expanded
+    ? {
+        layout: full,
+        lanes: full.lanes + 1,
+        toggleLane: full.lanes,
+        past,
+        anchorPx,
+      }
+    : {
+        layout: restLayout,
+        lanes: Math.max(restLanes + 1, 1),
+        toggleLane: restLanes,
+        past,
+        anchorPx,
+      };
+}
+
 /**
  * Pixel x of the CENTRE of a given ISO date within `year`, or null when the
  * date falls outside the displayed year. Used for the "today" marker line.
