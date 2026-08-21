@@ -11,7 +11,7 @@ import type {
 } from "@/app/tools/multi-channel-marketing/aktionen/actions";
 import {
   datePx,
-  layoutChannel,
+  layoutChannelCollapsible,
   monthColumns,
   formatDate,
   TRACK_WIDTH,
@@ -65,6 +65,8 @@ const BAR_HEIGHT = 8; // px — unlabeled day-accurate colour bar
 const ROW_BASE = 40; // px — default row height; holds up to BASE_LANES bars
 const BASE_LANES = 3; // up to 3 parallel actions fit within ROW_BASE
 const LANE_EXTRA = 16; // px added per lane beyond BASE_LANES
+const CHIP_HEIGHT = 14; // px — "+N vergangene" toggle, occupies one lane
+const CHIP_RESERVE = 96; // px (reference frame) needed right of the toggle
 const LABEL_WIDTH = "11rem";
 
 /** Channel row height: 40px for up to 3 lanes, then +16px per extra lane. */
@@ -159,6 +161,23 @@ export function CalendarView({
       .sort((a, b) => a.group.localeCompare(b.group, "de"));
   }, [visibleSegments, brands]);
 
+  // Channels whose finished actions the user unfolded again (by channel id).
+  const [expandedChannels, setExpandedChannels] = useState<Set<string>>(
+    () => new Set(),
+  );
+  function toggleChannel(id: string) {
+    setExpandedChannels((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  // Finished actions are folded away from today onwards; a past year is history
+  // the user opened on purpose, so there nothing collapses.
+  const collapseCutoff =
+    todayIso && year >= Number(todayIso.slice(0, 4)) ? todayIso : null;
+
   // Group segments by channel, then lay each visible channel out into stacked
   // lanes (keyed by brand, so one brand's non-overlapping bars line up).
   const byChannel = useMemo(() => {
@@ -168,11 +187,21 @@ export function CalendarView({
       list.push(s);
       map.set(s.action.marketplace_id, list);
     }
-    return visibleChannels.map((c) => ({
-      channel: c,
-      layout: layoutChannel(map.get(c.id) ?? [], year, (s) => s.brand.id),
-    }));
-  }, [segments, visibleChannels, year]);
+    return visibleChannels.map((c) => {
+      const row = layoutChannelCollapsible(map.get(c.id) ?? [], year, {
+        cutoff: collapseCutoff,
+        expanded: expandedChannels.has(c.id),
+        baseLanes: BASE_LANES,
+        getGroup: (s) => s.brand.id,
+      });
+      return {
+        channel: c,
+        row,
+        // Bars are per brand — the user counts actions, so label it that way.
+        pastCount: new Set(row.past.map((s) => s.action.id)).size,
+      };
+    });
+  }, [segments, visibleChannels, year, collapseCutoff, expandedChannels]);
 
   function openCreate() {
     setEditing(null);
@@ -307,9 +336,11 @@ export function CalendarView({
           </div>
 
           {/* Channel rows */}
-          {byChannel.map(({ channel, layout }) => {
-            const rowH = rowHeight(layout.lanes);
-            const slot = rowH / layout.lanes;
+          {byChannel.map(({ channel, row, pastCount }) => {
+            const { layout, toggleLane } = row;
+            const rowH = rowHeight(row.lanes);
+            const slot = rowH / row.lanes;
+            const expanded = expandedChannels.has(channel.id);
             return (
             <div key={channel.id} className="flex border-b last:border-b-0">
               <div
@@ -370,6 +401,31 @@ export function CalendarView({
                     </Tooltip>
                   </TooltipProvider>
                 ))}
+
+                {/* Folded-away past actions: one lane holds the toggle chip. */}
+                {toggleLane !== null && (
+                  <button
+                    type="button"
+                    onClick={() => toggleChannel(channel.id)}
+                    aria-expanded={expanded}
+                    title={`${pastCount} vergangene ${
+                      pastCount === 1 ? "Aktion" : "Aktionen"
+                    } in ${channel.name} ${
+                      expanded ? "ausblenden" : "einblenden"
+                    }`}
+                    className="absolute inline-flex items-center whitespace-nowrap rounded-full border bg-muted px-1.5 text-[10px] font-medium leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    style={{
+                      top: toggleLane * slot + (slot - CHIP_HEIGHT) / 2,
+                      height: CHIP_HEIGHT,
+                      ...(row.anchorPx > TRACK_WIDTH - CHIP_RESERVE
+                        ? { right: 4 }
+                        : { left: pct(row.anchorPx) }),
+                    }}
+                  >
+                    {expanded ? "−" : "+"}
+                    {pastCount} vergangene
+                  </button>
+                )}
 
                 {/* "Today" marker: dashed line, below the month axis, click-through */}
                 {todayLeft !== null && (

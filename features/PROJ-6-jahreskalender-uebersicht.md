@@ -255,5 +255,23 @@ Der im ursprünglichen Scope ausgelagerte Filter „eigene Webshops vs. externe 
 
 **Verifikation:** `tsc --noEmit` ✓, `next build` ✓, `npm test` (58 Tests) ✓.
 
+## Vergangene Aktionen einklappen (Folge-Feature)
+**Stand:** 2026-08-21
+
+**Problem:** Zeilen mit vielen parallelen Aktionen wurden sehr hoch (z.B. Kaufland im Juni: 6 Spuren), obwohl die Aktionen längst gelaufen waren.
+
+**Lösung:** Abgelaufene Aktionen (`end_date < heute`) werden je Kanal-Zeile eingeklappt; eine Spur bleibt für den Umschalter „+N vergangene" reserviert.
+
+- `calendar-layout.ts`: neue reine Funktion **`layoutChannelCollapsible(items, year, { cutoff, expanded, baseLanes, getGroup })`** → `{ layout, lanes, toggleLane, past, anchorPx }`.
+- **Eingeklappt wird nur, wenn es wirklich Höhe spart:** die Zeile muss `baseLanes` (3) überschreiten *und* die vergangenen Balken müssen mehr Spuren freigeben, als die Umschalter-Spur kostet. Kompakte Zeilen zeigen ihre Historie weiterhin vollständig.
+- `cutoff = null` (Nutzer betrachtet ein vergangenes Jahr) deaktiviert das Einklappen komplett — sonst wäre dort alles „vergangen" und jede Zeile leer.
+- `calendar-view.tsx`: Zustand `expandedChannels` (Set von Kanal-IDs); Chip als Button in der letzten Spur, positioniert am frühesten eingeklappten Balken (rechts angeschlagen, falls er sonst über den Dezember hinausragt). Label zählt **Aktionen**, nicht Balken (eine Aktion mit 3 Marken = 3 Balken).
+- Aufgeklappt zeigt die Zeile alles wie zuvor, plus Umschalter-Spur („−N vergangene").
+- Legende bleibt unverändert (Jahresdaten, unabhängig vom Einklappen).
+
+**Nicht enthalten:** Die Monats-Detailansicht (PROJ-8) klappt nicht ein — dort ist nur ein Monat sichtbar, die Zeilen bleiben flach.
+
+**Verifikation:** `tsc --noEmit` ✓, `next build` ✓, `npm test` (65 Tests, davon 7 neu in `src/lib/calendar-layout.test.ts`) ✓.
+
 ## Deployment
 _To be added by /deploy_
