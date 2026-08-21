@@ -72,7 +72,7 @@ const ROW_BASE = 40; // px — default row height; holds up to BASE_LANES bars
 const BASE_LANES = 3; // up to 3 parallel actions fit within ROW_BASE
 const LANE_EXTRA = 16; // px added per lane beyond BASE_LANES
 const CHIP_HEIGHT = 12; // px — bare-text toggle, sits inside one lane
-const CHIP_RESERVE = 80; // px (reference frame) needed right of the toggle
+const CHIP_RESERVE = 44; // px (reference frame) needed right of the toggle
 const LABEL_WIDTH = "11rem";
 
 /** Channel row height: 40px for up to 3 lanes, then +16px per extra lane. */
@@ -431,7 +431,7 @@ export function CalendarView({
                         aria-hidden
                       />
                     )}
-                    {expanded ? "weniger zeigen" : "mehr zeigen"}
+                    {expanded ? "weniger" : "mehr"}
                   </button>
                 ))}
 

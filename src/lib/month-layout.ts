@@ -9,6 +9,8 @@
  * brand prefers a lane it already occupies so its bars line up.
  */
 
+import { addDays } from "./calendar-layout";
+
 export { isLightColor, formatDate } from "./calendar-layout";
 
 /** Readable pixels per day (year view uses 2px; the month zoom is much wider). */
@@ -190,6 +192,114 @@ export function layoutMonthChannel<T extends MonthCalendarItem>(
   }
 
   return { lanes: Math.max(lanes.length, 1), items: result };
+}
+
+/** Days of track the "mehr anzeigen" label claims while lanes are packed. */
+const CHIP_RESERVE_DAYS = 3; // ≈84px at DAY_WIDTH 28
+
+/** Placement of one "mehr anzeigen" toggle, anchored at its action. */
+export type MonthChipPlacement = {
+  actionId: string;
+  leftPx: number;
+  lane: number;
+};
+
+export type CollapsibleMonthLayout<T> = {
+  items: LaidOutMonthItem<T>[];
+  chips: MonthChipPlacement[];
+  lanes: number;
+};
+
+/**
+ * Month layout that truncates finished actions so a busy row keeps its default
+ * height — the month-view twin of `layoutChannelCollapsible`.
+ *
+ * The base row holds `baseLanes` (2) bars here, so a past action with more than
+ * 2 brands shows a single brand plus the toggle in the second lane. Running and
+ * planned actions are never truncated.
+ */
+export function layoutMonthChannelCollapsible<T extends MonthCalendarItem>(
+  items: T[],
+  year: number,
+  monthIndex: number,
+  {
+    cutoff,
+    expanded = false,
+    baseLanes = 2,
+    getGroup,
+    getActionId,
+    getSortKey,
+  }: {
+    cutoff: string | null;
+    expanded?: boolean;
+    baseLanes?: number;
+    getGroup: (item: T) => string;
+    getActionId: (item: T) => string;
+    getSortKey: (item: T) => string;
+  },
+): CollapsibleMonthLayout<T> {
+  const byAction = new Map<string, T[]>();
+  for (const item of items) {
+    const id = getActionId(item);
+    const list = byAction.get(id) ?? [];
+    list.push(item);
+    byAction.set(id, list);
+  }
+
+  // Bars and chips are packed together, so a chip can never land on a bar.
+  type Packed = MonthCalendarItem & { g: string; bar?: T; chipFor?: string };
+  const packables: Packed[] = [];
+
+  for (const [actionId, segs] of byAction) {
+    // All bars of an action share its date range, so one segment decides.
+    const isPast = cutoff !== null && segs[0].end_date < cutoff;
+    const truncatable = isPast && segs.length > baseLanes;
+
+    const shown =
+      truncatable && !expanded
+        ? [...segs]
+            .sort((a, b) => getSortKey(a).localeCompare(getSortKey(b), "de"))
+            .slice(0, baseLanes - 1)
+        : segs;
+
+    for (const s of shown) {
+      packables.push({
+        id: s.id,
+        start_date: s.start_date,
+        end_date: s.end_date,
+        g: getGroup(s),
+        bar: s,
+      });
+    }
+
+    if (truncatable) {
+      packables.push({
+        id: `chip:${actionId}`,
+        start_date: segs[0].start_date,
+        end_date: addDays(segs[0].end_date, CHIP_RESERVE_DAYS),
+        g: `chip:${actionId}`, // unique, so lane affinity never reuses it
+        chipFor: actionId,
+      });
+    }
+  }
+
+  const packed = layoutMonthChannel(packables, year, monthIndex, (p) => p.g);
+
+  const laidOutItems: LaidOutMonthItem<T>[] = [];
+  const chips: MonthChipPlacement[] = [];
+  for (const laid of packed.items) {
+    if (laid.item.bar) {
+      laidOutItems.push({ ...laid, item: laid.item.bar });
+    } else if (laid.item.chipFor) {
+      chips.push({
+        actionId: laid.item.chipFor,
+        leftPx: laid.leftPx,
+        lane: laid.lane,
+      });
+    }
+  }
+
+  return { items: laidOutItems, chips, lanes: packed.lanes };
 }
 
 /**

@@ -231,3 +231,21 @@ Umgesetzt gemäß Tech Design — reine Frontend-Erweiterung, kein neues Schema,
 Erster Production-Deploy der gesamten App (PROJ-1…8 + PROJ-11) via Vercel CLI (`vercel --prod`). Verifiziert: `/login` → HTTP 200, `/` → 307 Redirect auf `/login` (Auth-Schutz), alle 4 Security-Header live (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS). Env-Vars (`NEXT_PUBLIC_SUPABASE_*`) für Production/Preview/Development gesetzt. Git-Tag `v1.0.0`.
 
 **Offen:** GitHub-Auto-Deploy noch nicht verbunden (Repo `BSL1087/...` vs. Team-Scope `agon-s-world`) — bis dahin Deploys manuell per `vercel --prod`.
+
+## Vergangene Aktionen kürzen (Folge-Feature)
+**Stand:** 2026-08-21
+
+Übernimmt die Regel aus PROJ-6 (siehe dort für Begründung und Nutzer-Entscheidungen), angepasst an die Basishöhe der Monatsansicht von **2 Spuren**:
+
+- Eine **vergangene** Aktion (`end_date < heute`) mit **mehr als 2 Marken** zeigt nur die erste Marke (alphabetisch); der Platz der zweiten Marke trägt den Umschalter „mehr anzeigen".
+- Aktionen mit bis zu 2 Marken bleiben vollständig — sie passen in die Basishöhe.
+- Laufende und geplante Aktionen werden nie gekürzt.
+- Ein Klick klappt die ganze Kanal-Zeile auf („weniger anzeigen").
+
+**Technisch:** `layoutMonthChannelCollapsible()` in `month-layout.ts` — dieselbe Mechanik wie die Jahresansicht (Balken und Chips werden gemeinsam gepackt, Chip mit eindeutiger Gruppe, reservierte Achsenbreite `CHIP_RESERVE_DAYS = 3` ≈ 84px bei `DAY_WIDTH = 28`). `addDays()` wird aus `calendar-layout.ts` mitbenutzt statt dupliziert. `month-view.tsx` bekommt `todayIso` (nach Mount gesetzt, wie in der Jahresansicht, gegen Hydration-Mismatch) und `expandedChannels`.
+
+**Längerer Text als in der Jahresansicht:** Bei 28px pro Tag statt 2px ist Platz — deshalb „mehr anzeigen" statt nur „mehr", Schriftgröße 11px passend zu den Balken-Labels.
+
+**Betroffene Echtdaten (geprüft per Supabase-MCP):** Amazon (Prime Days, Juni), Decathlon + Kaufland + Otto (20% Kampagne Fitness, Mai), Kaufland (Sparfuchswoche, Juni), Otto (Fitness Sale, Juni) — alle mit 3+ Marken und vergangen. WS-Family's World bleibt unverändert (läuft noch).
+
+**Verifikation:** `tsc --noEmit` ✓, `next build` ✓, `npm test` (71 Tests, davon 5 neu für `layoutMonthChannelCollapsible`) ✓.

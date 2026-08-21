@@ -7,6 +7,7 @@ import {
   monthDays,
   monthBarGeometry,
   layoutMonthChannel,
+  layoutMonthChannelCollapsible,
   resolveMonth,
 } from "./month-layout";
 
@@ -139,6 +140,101 @@ describe("layoutMonthChannel", () => {
     const laneOf = (id: string) =>
       layout.items.find((i) => i.item.id === id)?.lane;
     expect(laneOf("x1")).toBe(laneOf("x2")); // brand X stays on one track
+  });
+});
+
+describe("layoutMonthChannelCollapsible", () => {
+  type Seg = {
+    id: string;
+    start_date: string;
+    end_date: string;
+    action: string;
+    brand: string;
+  };
+
+  /** An action with one bar per brand, as the month view builds them. */
+  const action = (
+    name: string,
+    from: string,
+    to: string,
+    brands: string[],
+  ): Seg[] =>
+    brands.map((brand) => ({
+      id: `${name}:${brand}`,
+      start_date: from,
+      end_date: to,
+      action: name,
+      brand,
+    }));
+
+  const opts = {
+    cutoff: "2026-06-20",
+    getGroup: (s: Seg) => s.brand,
+    getActionId: (s: Seg) => s.action,
+    getSortKey: (s: Seg) => s.brand,
+  };
+
+  it("keeps a past action complete when 2 brands fit the base row", () => {
+    const items = action("a", "2026-06-04", "2026-06-10", ["Dooky", "Haakaa"]);
+    const row = layoutMonthChannelCollapsible(items, 2026, 5, opts);
+
+    expect(row.chips).toEqual([]);
+    expect(row.items).toHaveLength(2);
+    expect(row.lanes).toBe(2);
+  });
+
+  it("truncates a past action to 1 brand plus a toggle in the second lane", () => {
+    const items = action("a", "2026-06-04", "2026-06-10", [
+      "Dooky",
+      "Haakaa",
+      "Prfrm",
+    ]);
+    const row = layoutMonthChannelCollapsible(items, 2026, 5, opts);
+
+    expect(row.items.map((i) => i.item.brand)).toEqual(["Dooky"]);
+    expect(row.chips).toHaveLength(1);
+    expect(row.chips[0].lane).toBe(1);
+    expect(row.lanes).toBe(2); // base height
+  });
+
+  it("never truncates an action that is still running", () => {
+    const items = action("a", "2026-06-04", "2026-06-28", [
+      "Dooky",
+      "Haakaa",
+      "Prfrm",
+      "Tega",
+    ]);
+    const row = layoutMonthChannelCollapsible(items, 2026, 5, opts);
+
+    expect(row.chips).toEqual([]);
+    expect(row.items).toHaveLength(4);
+  });
+
+  it("puts every brand back when expanded", () => {
+    const items = action("a", "2026-06-04", "2026-06-10", [
+      "Dooky",
+      "Haakaa",
+      "Prfrm",
+    ]);
+    const row = layoutMonthChannelCollapsible(items, 2026, 5, {
+      ...opts,
+      expanded: true,
+    });
+
+    expect(row.items).toHaveLength(3);
+    expect(row.chips).toHaveLength(1);
+    expect(row.lanes).toBe(4); // 3 brands + the toggle lane
+  });
+
+  it("anchors the toggle at its own action", () => {
+    const items = action("a", "2026-06-04", "2026-06-10", [
+      "Dooky",
+      "Haakaa",
+      "Prfrm",
+    ]);
+    const row = layoutMonthChannelCollapsible(items, 2026, 5, opts);
+
+    expect(row.chips[0].leftPx).toBe(row.items[0].leftPx);
   });
 });
 

@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CalendarRange,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Plus,
 } from "lucide-react";
 
@@ -18,7 +20,7 @@ import {
   DAY_WIDTH,
   formatDate,
   isLightColor,
-  layoutMonthChannel,
+  layoutMonthChannelCollapsible,
   monthDays,
   monthName,
   monthTrackWidth,
@@ -98,7 +100,33 @@ export function MonthView({
   const pct = (px: number) => `${(px / trackRef) * 100}%`;
   const segments = useMemo(() => toSegments(actions), [actions]);
 
+  // Today as ISO — resolved after mount (local date, avoids a hydration
+  // mismatch). Drives which actions count as finished.
+  const [todayIso, setTodayIso] = useState<string | null>(null);
+  useEffect(() => {
+    const d = new Date();
+    setTodayIso(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate(),
+      ).padStart(2, "0")}`,
+    );
+  }, []);
+
+  // Channels whose truncated actions the user unfolded again (by channel id).
+  const [expandedChannels, setExpandedChannels] = useState<Set<string>>(
+    () => new Set(),
+  );
+  function toggleChannel(id: string) {
+    setExpandedChannels((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
   // Group segments by channel, then lay each channel into stacked lanes.
+  // Finished actions with more brands than the base row holds are truncated
+  // behind a toggle; running and planned ones always show every brand.
   const byChannel = useMemo(() => {
     const map = new Map<string, ActionSegment[]>();
     for (const s of segments) {
@@ -108,14 +136,16 @@ export function MonthView({
     }
     return channels.map((c) => ({
       channel: c,
-      layout: layoutMonthChannel(
-        map.get(c.id) ?? [],
-        year,
-        month,
-        (s) => s.brand.id,
-      ),
+      layout: layoutMonthChannelCollapsible(map.get(c.id) ?? [], year, month, {
+        cutoff: todayIso,
+        expanded: expandedChannels.has(c.id),
+        baseLanes: BASE_LANES,
+        getGroup: (s) => s.brand.id,
+        getActionId: (s) => s.action.id,
+        getSortKey: (s) => s.brand.name,
+      }),
     }));
-  }, [segments, channels, year, month]);
+  }, [segments, channels, year, month, todayIso, expandedChannels]);
 
   // Colour legend: brands present this month, grouped by product group.
   const legend = useMemo(() => {
@@ -257,6 +287,7 @@ export function MonthView({
           {/* Channel rows */}
           {byChannel.map(({ channel, layout }) => {
             const rowH = rowHeight(layout.lanes);
+            const expanded = expandedChannels.has(channel.id);
             return (
               <div key={channel.id} className="flex border-b last:border-b-0">
                 <div
@@ -345,6 +376,35 @@ export function MonthView({
                       );
                     },
                   )}
+
+                  {/* Truncated past actions: the toggle takes the lane the
+                      hidden brands would have used. */}
+                  {layout.chips.map((chip) => (
+                    <button
+                      key={chip.actionId}
+                      type="button"
+                      onClick={() => toggleChannel(channel.id)}
+                      aria-expanded={expanded}
+                      title={
+                        expanded
+                          ? `Alle Marken in ${channel.name} wieder einklappen`
+                          : `Alle Marken in ${channel.name} anzeigen`
+                      }
+                      className="absolute inline-flex items-center gap-1 whitespace-nowrap rounded-sm px-1.5 text-[11px] font-medium leading-none text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      style={{
+                        left: pct(chip.leftPx),
+                        top: ROW_PAD + chip.lane * LANE_SLOT,
+                        height: BAR_HEIGHT,
+                      }}
+                    >
+                      {expanded ? (
+                        <ChevronUp className="h-3 w-3 shrink-0" aria-hidden />
+                      ) : (
+                        <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
+                      )}
+                      {expanded ? "weniger anzeigen" : "mehr anzeigen"}
+                    </button>
+                  ))}
                 </div>
               </div>
             );
