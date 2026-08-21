@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Plus,
+} from "lucide-react";
 
 import type {
   ActionBrand,
@@ -65,8 +71,8 @@ const BAR_HEIGHT = 8; // px — unlabeled day-accurate colour bar
 const ROW_BASE = 40; // px — default row height; holds up to BASE_LANES bars
 const BASE_LANES = 3; // up to 3 parallel actions fit within ROW_BASE
 const LANE_EXTRA = 16; // px added per lane beyond BASE_LANES
-const CHIP_HEIGHT = 14; // px — "+N vergangene" toggle, occupies one lane
-const CHIP_RESERVE = 96; // px (reference frame) needed right of the toggle
+const CHIP_HEIGHT = 12; // px — bare-text toggle, sits inside one lane
+const CHIP_RESERVE = 80; // px (reference frame) needed right of the toggle
 const LABEL_WIDTH = "11rem";
 
 /** Channel row height: 40px for up to 3 lanes, then +16px per extra lane. */
@@ -408,7 +414,7 @@ export function CalendarView({
                         ? `Alle Marken in ${channel.name} wieder einklappen`
                         : `Alle Marken in ${channel.name} anzeigen`
                     }
-                    className="absolute inline-flex items-center whitespace-nowrap rounded-full border bg-muted px-1.5 text-[10px] font-medium leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="absolute inline-flex items-center gap-0.5 whitespace-nowrap rounded-sm text-[10px] font-medium leading-none text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     style={{
                       top: chip.lane * slot + (slot - CHIP_HEIGHT) / 2,
                       height: CHIP_HEIGHT,
@@ -417,7 +423,15 @@ export function CalendarView({
                         : { left: pct(chip.leftPx) }),
                     }}
                   >
-                    {expanded ? "weniger anzeigen" : "weitere anzeigen"}
+                    {expanded ? (
+                      <ChevronUp className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                    ) : (
+                      <ChevronDown
+                        className="h-2.5 w-2.5 shrink-0"
+                        aria-hidden
+                      />
+                    )}
+                    {expanded ? "weniger zeigen" : "mehr zeigen"}
                   </button>
                 ))}
 

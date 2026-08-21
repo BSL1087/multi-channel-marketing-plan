@@ -268,10 +268,12 @@ Zuerst wurden **ganze vergangene Aktionen** ausgeblendet und durch einen Chip �
 
 Die Einheit ist die **Marke**, nicht der Aktionszeitraum — eine Aktion mit vielen Marken macht die Zeile hoch, nicht die Anzahl der Aktionen.
 
-- Eine **vergangene** Aktion (`end_date < heute`) mit **mehr als 3 Marken** zeigt nur die ersten 2 Marken (alphabetisch) plus einen Umschalter „weitere anzeigen" in der dritten Spur.
+- Eine **vergangene** Aktion (`end_date < heute`) mit **mehr als 3 Marken** zeigt nur die ersten 2 Marken (alphabetisch) plus einen Umschalter „mehr zeigen" in der dritten Spur.
 - Aktionen mit bis zu 3 Marken bleiben vollständig — sie passen bereits in die Standardhöhe.
 - **Laufende und geplante Aktionen werden nie gekürzt** (Nutzer-Entscheidung 2026-08-21), egal wie viele Marken sie haben. WS-Family's World (Summer-Sale, 5 Marken, läuft bis 23.08.) bleibt also 5 Spuren hoch.
-- Ein Klick klappt die **ganze Kanal-Zeile** auf (Nutzer-Entscheidung), nicht nur die eine Aktion; der Chip wird dann zu „weniger anzeigen".
+- Ein Klick klappt die **ganze Kanal-Zeile** auf (Nutzer-Entscheidung), nicht nur die eine Aktion; der Umschalter wird dann zu „weniger zeigen".
+
+**Darstellung des Umschalters (Nutzer-Entscheidung 2026-08-21):** Zuerst als Pille mit Rahmen und Füllung umgesetzt — wirkte „reingequetscht", weil sie mit 14px höher war als die Spur (13,3px) und als schwerstes Element der Zeile die eigentlichen Daten übertönte. Jetzt **reiner Text ohne Box**: kleine graue Schrift mit Chevron, 12px hoch, Hover unterstreicht. Label von „weitere anzeigen" auf „mehr zeigen" gekürzt (`CHIP_RESERVE_DAYS` entsprechend 48 → 40).
 
 **Technisch:**
 
