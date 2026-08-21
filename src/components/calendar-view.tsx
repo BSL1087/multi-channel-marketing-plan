@@ -173,13 +173,10 @@ export function CalendarView({
     });
   }
 
-  // Finished actions are folded away from today onwards; a past year is history
-  // the user opened on purpose, so there nothing collapses.
-  const collapseCutoff =
-    todayIso && year >= Number(todayIso.slice(0, 4)) ? todayIso : null;
-
   // Group segments by channel, then lay each visible channel out into stacked
   // lanes (keyed by brand, so one brand's non-overlapping bars line up).
+  // Finished actions with many brands are truncated behind a toggle; running
+  // and planned ones always show every brand.
   const byChannel = useMemo(() => {
     const map = new Map<string, ActionSegment[]>();
     for (const s of segments) {
@@ -187,21 +184,18 @@ export function CalendarView({
       list.push(s);
       map.set(s.action.marketplace_id, list);
     }
-    return visibleChannels.map((c) => {
-      const row = layoutChannelCollapsible(map.get(c.id) ?? [], year, {
-        cutoff: collapseCutoff,
+    return visibleChannels.map((c) => ({
+      channel: c,
+      row: layoutChannelCollapsible(map.get(c.id) ?? [], year, {
+        cutoff: todayIso,
         expanded: expandedChannels.has(c.id),
         baseLanes: BASE_LANES,
         getGroup: (s) => s.brand.id,
-      });
-      return {
-        channel: c,
-        row,
-        // Bars are per brand — the user counts actions, so label it that way.
-        pastCount: new Set(row.past.map((s) => s.action.id)).size,
-      };
-    });
-  }, [segments, visibleChannels, year, collapseCutoff, expandedChannels]);
+        getActionId: (s) => s.action.id,
+        getSortKey: (s) => s.brand.name,
+      }),
+    }));
+  }, [segments, visibleChannels, year, todayIso, expandedChannels]);
 
   function openCreate() {
     setEditing(null);
@@ -336,8 +330,7 @@ export function CalendarView({
           </div>
 
           {/* Channel rows */}
-          {byChannel.map(({ channel, row, pastCount }) => {
-            const { layout, toggleLane } = row;
+          {byChannel.map(({ channel, row }) => {
             const rowH = rowHeight(row.lanes);
             const slot = rowH / row.lanes;
             const expanded = expandedChannels.has(channel.id);
@@ -360,7 +353,7 @@ export function CalendarView({
                 ))}
 
                 {/* Day-accurate action bars (stacked on overlap) */}
-                {layout.items.map(({ item, leftPx, widthPx, lane }) => (
+                {row.items.map(({ item, leftPx, widthPx, lane }) => (
                   <TooltipProvider key={item.id} delayDuration={150}>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -402,30 +395,31 @@ export function CalendarView({
                   </TooltipProvider>
                 ))}
 
-                {/* Folded-away past actions: one lane holds the toggle chip. */}
-                {toggleLane !== null && (
+                {/* Truncated past actions: the toggle sits in the next lane,
+                    anchored at the action whose brands it hides. */}
+                {row.chips.map((chip) => (
                   <button
+                    key={chip.actionId}
                     type="button"
                     onClick={() => toggleChannel(channel.id)}
                     aria-expanded={expanded}
-                    title={`${pastCount} vergangene ${
-                      pastCount === 1 ? "Aktion" : "Aktionen"
-                    } in ${channel.name} ${
-                      expanded ? "ausblenden" : "einblenden"
-                    }`}
+                    title={
+                      expanded
+                        ? `Alle Marken in ${channel.name} wieder einklappen`
+                        : `Alle Marken in ${channel.name} anzeigen`
+                    }
                     className="absolute inline-flex items-center whitespace-nowrap rounded-full border bg-muted px-1.5 text-[10px] font-medium leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     style={{
-                      top: toggleLane * slot + (slot - CHIP_HEIGHT) / 2,
+                      top: chip.lane * slot + (slot - CHIP_HEIGHT) / 2,
                       height: CHIP_HEIGHT,
-                      ...(row.anchorPx > TRACK_WIDTH - CHIP_RESERVE
+                      ...(chip.leftPx > TRACK_WIDTH - CHIP_RESERVE
                         ? { right: 4 }
-                        : { left: pct(row.anchorPx) }),
+                        : { left: pct(chip.leftPx) }),
                     }}
                   >
-                    {expanded ? "−" : "+"}
-                    {pastCount} vergangene
+                    {expanded ? "weniger anzeigen" : "weitere anzeigen"}
                   </button>
-                )}
+                ))}
 
                 {/* "Today" marker: dashed line, below the month axis, click-through */}
                 {todayLeft !== null && (
