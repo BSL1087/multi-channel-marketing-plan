@@ -1,6 +1,6 @@
 # PROJ-12: Rabattwert je Marke
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-08-23
 **Last Updated:** 2026-08-23
 
@@ -334,4 +334,40 @@ Erst ausführen, wenn die neue Version live und geprüft ist. Bis dahin bleibt d
 - **Recommendation:** PROJ-12 freigeben und deployen. Direkt nach dem Deploy: kurzer manueller Smoke-Test, danach Phase 2 (Trigger, Funktion, alte Spalte entfernen). Anschließend PROJ-13 (Entwurf & Freigabe).
 
 ## Deployment
-_To be added by /deploy_
+
+**Status:** ✅ Deployed
+**Deployed:** 2026-08-23
+**Production URL:** https://multi-channel-marketing.vercel.app
+**Commits:** `edf4681` (feat PROJ-12), `85d2e9d` (docs PROJ-13)
+**Git Tag:** `v1.1.0-PROJ-12`
+
+### Pre-Deployment-Checks
+| Check | Ergebnis |
+|---|---|
+| `npm run build` | ✅ erfolgreich |
+| `tsc --noEmit` | ✅ fehlerfrei |
+| Unit-Tests | ✅ 93/93 |
+| QA | ✅ Approved, 0 Bugs |
+| Migrationen angewendet | ✅ Phase 1 + Übergangs-Trigger |
+| Secrets | ✅ `.env.local` gitignored, alle Variablen in `.env.local.example` |
+| `npm run lint` | ⚠️ im Projekt defekt (Next.js 16 hat `next lint` entfernt) — ersetzt durch Build + `tsc` |
+
+### Deploy-Ablauf
+Push auf `main` → GitHub-Anbindung löst den Vercel-Production-Deploy aus. GitHub-Deployment `6052601743` meldet **success**.
+
+### Post-Deployment-Verifikation (HTTP gegen Produktion)
+- `/login` → **200**
+- `/tools/multi-channel-marketing/aktionen` → **307** → `/login` (Route-Schutz greift in Produktion)
+- `/tools/multi-channel-marketing` → **307** → `/login`
+- `/api/keep-alive` → **200** (bestätigt zugleich die DB-Verbindung)
+
+### ⚠️ Offen: Phase 2 der Migration
+Bewusst **noch nicht** ausgeführt, solange die vorherige Vercel-Version als Rollback-Ziel gebraucht wird — nach dem Löschen der alten Spalte würde ein Rollback auf den alten Code fehlschlagen (er liest `discount_actions.discount_value`). Erst nach einem manuellen Smoke-Test im Browser ausführen:
+
+```sql
+drop trigger discount_action_brands_legacy_value on public.discount_action_brands;
+drop function public.discount_action_brands_legacy_value();
+alter table public.discount_actions drop column discount_value;
+```
+
+Bis dahin ist der Zustand konsistent: neue Aktionen lassen die alte Spalte leer, der Übergangs-Trigger füllt fehlende Werte nur für den alten Code-Pfad.
