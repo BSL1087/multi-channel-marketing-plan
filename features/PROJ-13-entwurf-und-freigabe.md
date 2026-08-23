@@ -1,6 +1,6 @@
 # PROJ-13: Entwurf & Freigabe (Aktions-Status)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-08-23
 **Last Updated:** 2026-08-23
 
@@ -377,4 +377,45 @@ Wie bei PROJ-12: **Backend zuerst** (Zustand + Freigabe-Angaben + Bestandsdaten)
 - **Recommendation:** PROJ-13 freigeben. Direkt nach dem Deploy zwei DB-Schritte nachziehen: (1) Standard-Vorgabe für `status` auf `'draft'` umstellen, (2) Phase 2 aus PROJ-12 (Übergangs-Trigger, Trigger-Funktion, alte Rabatt-Spalte entfernen). BUG-1 und BUG-2 bei Gelegenheit im Frontend beheben.
 
 ## Deployment
-_To be added by /deploy_
+
+**Status:** ✅ Deployed
+**Deployed:** 2026-08-23
+**Production URL:** https://multi-channel-marketing.vercel.app
+**Commit:** `02ec3a0`
+**Git Tag:** `v1.2.0-PROJ-13`
+
+### Pre-Deployment-Checks
+| Check | Ergebnis |
+|---|---|
+| `npm run build` | ✅ erfolgreich |
+| `tsc --noEmit` | ✅ fehlerfrei |
+| Unit-Tests | ✅ 99/99 |
+| QA | ✅ Approved (0 Critical/High/Medium, 3 Low) |
+| Migrationen angewendet | ✅ Status- und Freigabe-Spalten |
+| Secrets | ✅ unverändert, keine neuen Variablen |
+| `npm run lint` | ⚠️ im Projekt defekt (Next.js 16 hat `next lint` entfernt) — ersetzt durch Build + `tsc` |
+
+### Deploy-Ablauf
+Push auf `main` → Vercel-Production-Deploy. GitHub-Deployment `6053230876` (ref `02ec3a0`) meldet **success**.
+
+**Hinweis:** Die erste Statusabfrage lief zu früh und lieferte den Erfolg des *vorherigen* Deployments (`ee58342`). Beim Prüfen eines Deploys deshalb immer gegen den erwarteten Commit-Ref abgleichen, nicht nur gegen „neuestes Deployment".
+
+### Post-Deployment-Verifikation (HTTP gegen Produktion)
+- `/login` → **200**
+- `/tools/multi-channel-marketing/aktionen` → **307** → `/login`
+- `/tools/multi-channel-marketing` → **307** → `/login`
+- `/api/keep-alive` → **200** (bestätigt die DB-Verbindung)
+
+### Nachgelagerte DB-Schritte (nach dem Deploy ausgeführt)
+1. **`discount_actions_status_default_draft`** — Vorgabe für neue Aktionen von `'confirmed'` auf `'draft'` umgestellt. Vorher war `'confirmed'` nötig, damit der noch deployte alte Code (der die Spalte nicht kennt) weiterhin Kalender-Aktionen anlegt.
+2. **`discount_value_per_brand_phase2`** (Nachlauf zu PROJ-12) — Übergangs-Trigger `discount_action_brands_legacy_value`, die zugehörige Funktion und die alte Spalte `discount_actions.discount_value` entfernt.
+
+**Begründung für den Zeitpunkt von Schritt 2:** Direkt nach dem PROJ-12-Deploy wäre das riskant gewesen, weil ein Rollback auf die Vorversion die Spalte noch gelesen hätte. Inzwischen ist die einzige praktisch relevante Rollback-Stufe die PROJ-12-Version selbst — und die kommt ohne die alte Spalte aus.
+
+**Kontrolle nach beiden Schritten:** alte Spalte weg (0), Brücken-Trigger weg (0), Brücken-Funktion weg (0), `status`-Default = `'draft'`, 11 Aktionen, 32 Marken-Zuordnungen, **0 Zuordnungen ohne Rabattwert**. Produktion danach erneut geprüft: alle Routen unverändert erreichbar.
+
+### Offen
+- **Manueller Smoke-Test durch den Nutzer** steht aus (Entwurf anlegen, filtern, übernehmen, im Kalender prüfen, zurücksetzen). Der Monats-Zoom wird vom Nutzer in der Praxis geprüft.
+- **BUG-1** (Eingabetaste speichert als Entwurf) — vom Nutzer als akzeptabel eingestuft.
+- **BUG-2** (Leerzustand im Monats-Zoom nennt keine Entwürfe) — wartet auf die Praxis-Rückmeldung.
+- **BUG-3** (Merker wird beim Öffnen nicht zurückgesetzt) — latent, keine Auswirkung in gängigen Browsern.

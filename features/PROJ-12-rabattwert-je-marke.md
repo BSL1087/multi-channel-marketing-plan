@@ -361,8 +361,8 @@ Push auf `main` → GitHub-Anbindung löst den Vercel-Production-Deploy aus. Git
 - `/tools/multi-channel-marketing` → **307** → `/login`
 - `/api/keep-alive` → **200** (bestätigt zugleich die DB-Verbindung)
 
-### ⚠️ Offen: Phase 2 der Migration
-Bewusst **noch nicht** ausgeführt, solange die vorherige Vercel-Version als Rollback-Ziel gebraucht wird — nach dem Löschen der alten Spalte würde ein Rollback auf den alten Code fehlschlagen (er liest `discount_actions.discount_value`). Erst nach einem manuellen Smoke-Test im Browser ausführen:
+### ✅ Erledigt: Phase 2 der Migration (2026-08-23, nach dem PROJ-13-Deploy)
+Ausgeführt als Migration `discount_value_per_brand_phase2`, zusammen mit dem PROJ-13-Deploy. Zu diesem Zeitpunkt war die einzige praktisch relevante Rollback-Stufe bereits die PROJ-12-Version selbst, die ohne die alte Spalte auskommt:
 
 ```sql
 drop trigger discount_action_brands_legacy_value on public.discount_action_brands;
@@ -370,4 +370,4 @@ drop function public.discount_action_brands_legacy_value();
 alter table public.discount_actions drop column discount_value;
 ```
 
-Bis dahin ist der Zustand konsistent: neue Aktionen lassen die alte Spalte leer, der Übergangs-Trigger füllt fehlende Werte nur für den alten Code-Pfad.
+Kontrolle danach: alte Spalte weg, Trigger weg, Funktion weg, 32/32 Marken-Zuordnungen mit Rabattwert.

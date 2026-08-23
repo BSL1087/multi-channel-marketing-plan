@@ -27,7 +27,7 @@
 | PROJ-10 | Logo-Uploads für Marken & Marketplaces | Roadmap | P1 | PROJ-3, PROJ-4 | — | 2026-06-23 |
 | PROJ-11 | Produktgruppen verwalten | Deployed | P0 | PROJ-1, PROJ-2 | PROJ-11-produktgruppen-verwalten.md | 2026-06-25 |
 | PROJ-12 | Rabattwert je Marke | Deployed | P0 | PROJ-5, PROJ-4, PROJ-11 | PROJ-12-rabattwert-je-marke.md | 2026-08-23 |
-| PROJ-13 | Entwurf & Freigabe (Aktions-Status) | Approved | P0 | PROJ-5, PROJ-6, PROJ-7, PROJ-12 | PROJ-13-entwurf-und-freigabe.md | 2026-08-23 |
+| PROJ-13 | Entwurf & Freigabe (Aktions-Status) | Deployed | P0 | PROJ-5, PROJ-6, PROJ-7, PROJ-12 | PROJ-13-entwurf-und-freigabe.md | 2026-08-23 |
 
 <!-- Add features above this line -->
 
