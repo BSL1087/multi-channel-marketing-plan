@@ -61,9 +61,9 @@ describe("CalendarView channel rows", () => {
     expect(header("Eigene Webshops")).toContain("bg-emerald-200/80");
     expect(header("Händler")).toContain("bg-amber-100/90");
 
-    expect(channelRow("Amazon")).toContain("bg-sky-100/60");
-    expect(channelRow("WS-Assault Fitness")).toContain("bg-emerald-100/60");
-    expect(channelRow("Sport Müller")).toContain("bg-amber-50");
+    expect(channelRow("Amazon")).toContain("bg-sky-100/40");
+    expect(channelRow("WS-Assault Fitness")).toContain("bg-emerald-100/40");
+    expect(channelRow("Sport Müller")).toContain("bg-amber-50/70");
   });
 
   it("offers one filter checkbox per category with its channel count", () => {

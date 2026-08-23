@@ -41,10 +41,7 @@ export const CHANNEL_TYPE_LABELS_PLURAL: Record<ChannelType, string> = {
 /**
  * Tailwind classes per category, so a channel is recognisable by colour in the
  * year view, the month view and the channel list. One hue per category:
- * marketplace = blau, webshop = grün, händler = orange.
- */
-/**
- * Category colours for the calendars.
+ * marketplace = blau, webshop = grün, händler = gelb.
  *
  * `header` marks the start of a category, `row` tints the channel rows below it.
  * The three hues are deliberately NOT set to the same Tailwind step: at these
@@ -69,7 +66,7 @@ export const CHANNEL_TYPE_STYLES: Record<
 > = {
   marketplace: {
     header: "bg-sky-200/80 text-sky-900 dark:bg-sky-950/70 dark:text-sky-200",
-    row: "bg-sky-100/60 dark:bg-sky-950/30",
+    row: "bg-sky-100/40 dark:bg-sky-950/20",
     badge:
       "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200",
     swatch: "bg-sky-400",
@@ -77,7 +74,7 @@ export const CHANNEL_TYPE_STYLES: Record<
   webshop: {
     header:
       "bg-emerald-200/80 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-200",
-    row: "bg-emerald-100/60 dark:bg-emerald-950/30",
+    row: "bg-emerald-100/40 dark:bg-emerald-950/20",
     badge:
       "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
     swatch: "bg-emerald-400",
@@ -86,7 +83,7 @@ export const CHANNEL_TYPE_STYLES: Record<
     // One step lighter than the others: yellow reads strongest at equal steps.
     header:
       "bg-amber-100/90 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200",
-    row: "bg-amber-50 dark:bg-amber-950/30",
+    row: "bg-amber-50/70 dark:bg-amber-950/20",
     badge:
       "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
     swatch: "bg-amber-400",
