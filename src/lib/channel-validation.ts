@@ -69,7 +69,7 @@ export const CHANNEL_TYPE_STYLES: Record<
 > = {
   marketplace: {
     header: "bg-sky-200/80 text-sky-900 dark:bg-sky-950/70 dark:text-sky-200",
-    row: "bg-sky-100/40 dark:bg-sky-950/20",
+    row: "bg-sky-100/25 dark:bg-sky-950/15",
     badge:
       "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200",
     swatch: "bg-sky-400",
@@ -77,7 +77,7 @@ export const CHANNEL_TYPE_STYLES: Record<
   webshop: {
     header:
       "bg-emerald-200/80 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-200",
-    row: "bg-emerald-100/40 dark:bg-emerald-950/20",
+    row: "bg-emerald-100/25 dark:bg-emerald-950/15",
     badge:
       "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
     swatch: "bg-emerald-400",
@@ -86,7 +86,7 @@ export const CHANNEL_TYPE_STYLES: Record<
     // One step lighter than the others: yellow reads strongest at equal steps.
     header:
       "bg-amber-100/90 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200",
-    row: "bg-amber-100/30 dark:bg-amber-950/20",
+    row: "bg-amber-100/20 dark:bg-amber-950/15",
     badge:
       "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
     swatch: "bg-amber-400",
