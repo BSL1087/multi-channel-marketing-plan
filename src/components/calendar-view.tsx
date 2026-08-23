@@ -387,7 +387,7 @@ export function CalendarView({
                 return (
                 <div key={channel.id} className="flex border-b last:border-b-0">
                 <div
-                  className={`flex shrink-0 items-center border-r px-3 text-sm font-medium ${CHANNEL_TYPE_STYLES[group.type].label}`}
+                  className="flex shrink-0 items-center border-r px-3 text-sm font-medium"
                   style={{ width: LABEL_WIDTH }}
                 >
                   {channel.name}

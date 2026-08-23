@@ -45,23 +45,27 @@ describe("CalendarView channel rows", () => {
     ]);
   });
 
-  it("gives every category its own colour, shared by header and channel rows", () => {
+  it("colours the category headers, leaving the channel rows untinted", () => {
     const { container } = renderCalendar();
     const grid = container.querySelector(".overflow-x-auto > div");
     const rows = [...(grid?.children ?? [])];
 
+    // The header carries the separation between categories …
     const header = rows.find((el) => el.textContent?.startsWith("Händler"));
     expect(header?.className).toContain("bg-amber-100/80");
-
-    const label = rows
-      .find((el) => el.textContent?.trim() === "Sport Müller")
-      ?.firstElementChild;
-    expect(label?.className).toContain("bg-amber-50/70");
 
     const marketplaceHeader = rows.find((el) =>
       el.textContent?.startsWith("Marketplaces"),
     );
     expect(marketplaceHeader?.className).toContain("bg-sky-100/80");
+
+    // … while channel rows stay neutral. A tint light enough not to disturb the
+    // action bars is only perceptible in warm hues, so amber rows looked tinted
+    // and sky/emerald ones looked white — inconsistent despite identical rules.
+    const label = rows
+      .find((el) => el.textContent?.trim() === "Sport Müller")
+      ?.firstElementChild;
+    expect(label?.className).not.toMatch(/bg-(amber|sky|emerald)-50/);
   });
 
   it("offers one filter checkbox per category with its channel count", () => {

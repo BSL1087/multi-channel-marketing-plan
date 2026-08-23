@@ -43,13 +43,18 @@ export const CHANNEL_TYPE_LABELS_PLURAL: Record<ChannelType, string> = {
  * year view, the month view and the channel list. One hue per category:
  * marketplace = blau, webshop = grün, händler = orange.
  */
+/**
+ * Category colours. The group HEADER carries the visual separation between
+ * categories; channel rows stay untinted on purpose. A tint light enough not to
+ * disturb the coloured action bars is only perceptible in warm hues — amber read
+ * as tinted while sky and emerald looked white, which made the calendar appear
+ * inconsistent even though every category got the same treatment.
+ */
 export const CHANNEL_TYPE_STYLES: Record<
   ChannelType,
   {
     /** Group header row inside a calendar. */
     header: string;
-    /** Label cell of a channel row (left column of the calendar). */
-    label: string;
     /** Badge in the channel list. */
     badge: string;
     /** Small colour square (filter, legend). */
@@ -59,7 +64,6 @@ export const CHANNEL_TYPE_STYLES: Record<
   marketplace: {
     header:
       "bg-sky-100/80 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200",
-    label: "bg-sky-50/70 dark:bg-sky-950/30",
     badge:
       "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200",
     swatch: "bg-sky-400",
@@ -67,7 +71,6 @@ export const CHANNEL_TYPE_STYLES: Record<
   webshop: {
     header:
       "bg-emerald-100/80 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200",
-    label: "bg-emerald-50/70 dark:bg-emerald-950/30",
     badge:
       "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
     swatch: "bg-emerald-400",
@@ -75,7 +78,6 @@ export const CHANNEL_TYPE_STYLES: Record<
   retailer: {
     header:
       "bg-amber-100/80 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200",
-    label: "bg-amber-50/70 dark:bg-amber-950/30",
     badge:
       "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
     swatch: "bg-amber-400",
