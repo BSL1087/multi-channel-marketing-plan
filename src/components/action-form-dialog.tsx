@@ -447,7 +447,10 @@ export function ActionFormDialog({
                                     setValue(b.id, e.target.value)
                                   }
                                   maxLength={50}
-                                  placeholder="Rabatt"
+                                  // Zeigt die Einheit mit: ohne Beispiel tippen
+                                  // Nutzer nur die Zahl (der Wert ist Freitext,
+                                  // % und € sind beide gültig).
+                                  placeholder="z.B. 20%"
                                   disabled={isSubmitting}
                                   aria-label={`Rabattwert für ${b.name}`}
                                   aria-invalid={invalid}
