@@ -77,7 +77,7 @@ export const CHANNEL_TYPE_STYLES: Record<
   webshop: {
     header:
       "bg-emerald-200/80 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-200",
-    row: "bg-emerald-100/25 dark:bg-emerald-950/15",
+    row: "bg-emerald-100/20 dark:bg-emerald-950/15",
     badge:
       "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
     swatch: "bg-emerald-400",
