@@ -63,7 +63,7 @@ describe("CalendarView channel rows", () => {
 
     expect(channelRow("Amazon")).toContain("bg-sky-100/40");
     expect(channelRow("WS-Assault Fitness")).toContain("bg-emerald-100/40");
-    expect(channelRow("Sport Müller")).toContain("bg-amber-50/70");
+    expect(channelRow("Sport Müller")).toContain("bg-amber-100/30");
   });
 
   it("offers one filter checkbox per category with its channel count", () => {

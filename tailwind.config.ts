@@ -2,11 +2,12 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
     darkMode: ["class"],
-    content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
+    // Muss ALLE Dateien umfassen, die Klassennamen enthalten. Fehlt ein Ordner,
+    // erzeugt Tailwind die dortigen Klassen nicht — sie stehen dann im Code,
+    // aber nicht im Stylesheet. Genau so fehlten die Kanal-Farben aus
+    // `src/lib/channel-validation.ts` (nur Gelb erschien, weil `bg-amber-400`
+    // zufaellig auch in einer Komponente vorkommt).
+    content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
   	extend: {
   		colors: {

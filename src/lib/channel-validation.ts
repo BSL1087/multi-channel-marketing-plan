@@ -43,13 +43,16 @@ export const CHANNEL_TYPE_LABELS_PLURAL: Record<ChannelType, string> = {
  * year view, the month view and the channel list. One hue per category:
  * marketplace = blau, webshop = grün, händler = gelb.
  *
- * `header` marks the start of a category, `row` tints the channel rows below it.
- * The three hues are deliberately NOT set to the same Tailwind step: at these
- * light levels a warm hue reads far stronger than a cool one, so identical
- * values made amber look tinted while sky and emerald looked white. The steps
- * below are chosen for comparable *perceived* strength — sky and emerald sit one
- * step higher than amber, and the header always stays one step above its rows so
- * the category start remains recognisable.
+ * `header` marks the start of a category, `row` tints the channel rows below it;
+ * the header always stays a step above its rows so the category start remains
+ * recognisable. Amber sits one step lighter than sky/emerald because yellow
+ * reads stronger at the same step.
+ *
+ * NOTE: this file must be covered by the `content` globs in tailwind.config.ts.
+ * It wasn't for a long time, so these classes were missing from the stylesheet
+ * unless the same literal happened to appear in a scanned component — which is
+ * why only the amber swatch showed up (`bg-amber-400` also lives in
+ * action-manager.tsx) and the blue/green ones silently did nothing.
  */
 export const CHANNEL_TYPE_STYLES: Record<
   ChannelType,
@@ -83,7 +86,7 @@ export const CHANNEL_TYPE_STYLES: Record<
     // One step lighter than the others: yellow reads strongest at equal steps.
     header:
       "bg-amber-100/90 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200",
-    row: "bg-amber-50/70 dark:bg-amber-950/20",
+    row: "bg-amber-100/30 dark:bg-amber-950/20",
     badge:
       "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
     swatch: "bg-amber-400",
