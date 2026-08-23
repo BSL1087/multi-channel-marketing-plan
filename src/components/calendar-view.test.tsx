@@ -45,27 +45,25 @@ describe("CalendarView channel rows", () => {
     ]);
   });
 
-  it("colours the category headers, leaving the channel rows untinted", () => {
+  it("tints header and channel rows in every category, header a step stronger", () => {
     const { container } = renderCalendar();
     const grid = container.querySelector(".overflow-x-auto > div");
     const rows = [...(grid?.children ?? [])];
 
-    // The header carries the separation between categories …
-    const header = rows.find((el) => el.textContent?.startsWith("Händler"));
-    expect(header?.className).toContain("bg-amber-100/80");
+    const header = (name: string) =>
+      rows.find((el) => el.textContent?.startsWith(name))?.className ?? "";
+    const channelRow = (name: string) =>
+      rows.find((el) => el.textContent?.trim().startsWith(name))?.className ??
+      "";
 
-    const marketplaceHeader = rows.find((el) =>
-      el.textContent?.startsWith("Marketplaces"),
-    );
-    expect(marketplaceHeader?.className).toContain("bg-sky-100/80");
+    // Every category is tinted — no category may end up looking colourless.
+    expect(header("Marketplaces")).toContain("bg-sky-200/80");
+    expect(header("Eigene Webshops")).toContain("bg-emerald-200/80");
+    expect(header("Händler")).toContain("bg-amber-100/90");
 
-    // … while channel rows stay neutral. A tint light enough not to disturb the
-    // action bars is only perceptible in warm hues, so amber rows looked tinted
-    // and sky/emerald ones looked white — inconsistent despite identical rules.
-    const label = rows
-      .find((el) => el.textContent?.trim() === "Sport Müller")
-      ?.firstElementChild;
-    expect(label?.className).not.toMatch(/bg-(amber|sky|emerald)-50/);
+    expect(channelRow("Amazon")).toContain("bg-sky-100/60");
+    expect(channelRow("WS-Assault Fitness")).toContain("bg-emerald-100/60");
+    expect(channelRow("Sport Müller")).toContain("bg-amber-50");
   });
 
   it("offers one filter checkbox per category with its channel count", () => {

@@ -316,7 +316,10 @@ export function MonthView({
                 const rowH = rowHeight(layout.lanes);
                 const expanded = expandedChannels.has(channel.id);
                 return (
-                <div key={channel.id} className="flex border-b last:border-b-0">
+                <div
+                  key={channel.id}
+                  className={`flex border-b last:border-b-0 ${CHANNEL_TYPE_STYLES[group.type].row}`}
+                >
                   <div
                     className="flex shrink-0 items-center border-r px-3 text-sm font-medium"
                     style={{ width: LABEL_WIDTH }}

@@ -44,17 +44,23 @@ export const CHANNEL_TYPE_LABELS_PLURAL: Record<ChannelType, string> = {
  * marketplace = blau, webshop = grün, händler = orange.
  */
 /**
- * Category colours. The group HEADER carries the visual separation between
- * categories; channel rows stay untinted on purpose. A tint light enough not to
- * disturb the coloured action bars is only perceptible in warm hues — amber read
- * as tinted while sky and emerald looked white, which made the calendar appear
- * inconsistent even though every category got the same treatment.
+ * Category colours for the calendars.
+ *
+ * `header` marks the start of a category, `row` tints the channel rows below it.
+ * The three hues are deliberately NOT set to the same Tailwind step: at these
+ * light levels a warm hue reads far stronger than a cool one, so identical
+ * values made amber look tinted while sky and emerald looked white. The steps
+ * below are chosen for comparable *perceived* strength — sky and emerald sit one
+ * step higher than amber, and the header always stays one step above its rows so
+ * the category start remains recognisable.
  */
 export const CHANNEL_TYPE_STYLES: Record<
   ChannelType,
   {
     /** Group header row inside a calendar. */
     header: string;
+    /** Channel rows belonging to that group. */
+    row: string;
     /** Badge in the channel list. */
     badge: string;
     /** Small colour square (filter, legend). */
@@ -62,22 +68,25 @@ export const CHANNEL_TYPE_STYLES: Record<
   }
 > = {
   marketplace: {
-    header:
-      "bg-sky-100/80 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200",
+    header: "bg-sky-200/80 text-sky-900 dark:bg-sky-950/70 dark:text-sky-200",
+    row: "bg-sky-100/60 dark:bg-sky-950/30",
     badge:
       "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200",
     swatch: "bg-sky-400",
   },
   webshop: {
     header:
-      "bg-emerald-100/80 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200",
+      "bg-emerald-200/80 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-200",
+    row: "bg-emerald-100/60 dark:bg-emerald-950/30",
     badge:
       "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
     swatch: "bg-emerald-400",
   },
   retailer: {
+    // One step lighter than the others: yellow reads strongest at equal steps.
     header:
-      "bg-amber-100/80 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200",
+      "bg-amber-100/90 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200",
+    row: "bg-amber-50 dark:bg-amber-950/30",
     badge:
       "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
     swatch: "bg-amber-400",
