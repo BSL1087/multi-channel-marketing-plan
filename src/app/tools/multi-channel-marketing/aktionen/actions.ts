@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { actionSchema } from "@/lib/action-validation";
 
 const PATH = "/tools/multi-channel-marketing/aktionen";
+/** The calendar shows only confirmed actions, so a status change affects it too. */
+const CALENDAR_PATH = "/tools/multi-channel-marketing";
 
 export type ActionBrand = {
   id: string;
@@ -14,6 +16,12 @@ export type ActionBrand = {
   /** This brand's own discount value within the action (PROJ-12). */
   discount_value: string;
 };
+
+/**
+ * Draft = planned, not yet booked in the marketplace, invisible in the
+ * calendar. Confirmed = really booked, part of the binding year view (PROJ-13).
+ */
+export type ActionStatus = "draft" | "confirmed";
 
 export type DiscountAction = {
   id: string;
@@ -25,6 +33,11 @@ export type DiscountAction = {
   marketplace_name: string;
   /** One or more brands involved in this action, each with its own value. */
   brands: ActionBrand[];
+  status: ActionStatus;
+  /** Set only while confirmed: when it was committed and by whom. */
+  confirmed_at: string | null;
+  /** Snapshot of the confirmer's email, taken when the action was committed. */
+  confirmed_by_email: string | null;
 };
 
 /** One selected brand plus the discount value entered for it. */
@@ -89,10 +102,21 @@ function one<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-export async function createAction(input: ActionInput): Promise<ActionResult> {
+/**
+ * Creates an action in the given state. `status` is deliberately a separate
+ * argument rather than a form field: it is chosen by which save button was
+ * pressed, not typed by the user.
+ */
+export async function createAction(
+  input: ActionInput,
+  status: ActionStatus = "confirmed",
+): Promise<ActionResult> {
   const parsed = validate(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
+  }
+  if (status !== "draft" && status !== "confirmed") {
+    return { ok: false, message: "Ungültiger Status." };
   }
 
   const supabase = await createClient();
@@ -103,7 +127,15 @@ export async function createAction(input: ActionInput): Promise<ActionResult> {
 
   const { data: created, error } = await supabase
     .from("discount_actions")
-    .insert(toRow(input))
+    .insert({
+      ...toRow(input),
+      status,
+      // A brand-new action is only "confirmed by" someone if it goes straight
+      // into the calendar; a draft carries no approval.
+      confirmed_by: status === "confirmed" ? user.id : null,
+      confirmed_at: status === "confirmed" ? new Date().toISOString() : null,
+      confirmed_by_email: status === "confirmed" ? (user.email ?? null) : null,
+    })
     .select("id")
     .single();
   if (error || !created) {
@@ -125,6 +157,7 @@ export async function createAction(input: ActionInput): Promise<ActionResult> {
   }
 
   revalidatePath(PATH);
+  revalidatePath(CALENDAR_PATH);
   return { ok: true };
 }
 
@@ -185,6 +218,51 @@ export async function updateAction(
   }
 
   revalidatePath(PATH);
+  revalidatePath(CALENDAR_PATH);
+  return { ok: true };
+}
+
+/**
+ * Moves an action between draft and calendar (PROJ-13). Deliberately separate
+ * from `updateAction`: committing an action is a statement about reality, not
+ * a side effect of fixing a typo. Only status columns are written, so it never
+ * overwrites someone else's concurrent content edit.
+ */
+export async function setActionStatus(
+  id: string,
+  status: ActionStatus,
+): Promise<ActionResult> {
+  if (status !== "draft" && status !== "confirmed") {
+    return { ok: false, message: "Ungültiger Status." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Nicht eingeloggt." };
+
+  const { data: updated, error } = await supabase
+    .from("discount_actions")
+    .update({
+      status,
+      // Going back to draft clears the approval — otherwise the record would
+      // still claim someone signed off on it.
+      confirmed_by: status === "confirmed" ? user.id : null,
+      confirmed_at: status === "confirmed" ? new Date().toISOString() : null,
+      confirmed_by_email: status === "confirmed" ? (user.email ?? null) : null,
+    })
+    .eq("id", id)
+    .select("id");
+  if (error) {
+    return { ok: false, message: "Status konnte nicht geändert werden." };
+  }
+  if (!updated || updated.length === 0) {
+    return { ok: false, message: "Diese Aktion existiert nicht mehr." };
+  }
+
+  revalidatePath(PATH);
+  revalidatePath(CALENDAR_PATH);
   return { ok: true };
 }
 
@@ -201,6 +279,8 @@ export type ActionConflict = {
   endDate: string;
   /** Same channel → double-discount risk; different channel → cannibalisation. */
   sameChannel: boolean;
+  /** Drafts are flagged in the warning: planned, not actually booked (PROJ-13). */
+  status: ActionStatus;
 };
 
 export type ConflictInput = {
@@ -227,6 +307,7 @@ type ConflictRow = {
         marketplace_id: string;
         start_date: string;
         end_date: string;
+        status: ActionStatus;
         marketplaces: { name: string } | { name: string }[] | null;
       }
     | {
@@ -235,6 +316,7 @@ type ConflictRow = {
         marketplace_id: string;
         start_date: string;
         end_date: string;
+        status: ActionStatus;
         marketplaces: { name: string } | { name: string }[] | null;
       }[]
     | null;
@@ -263,7 +345,7 @@ export async function findActionConflicts(
   const { data, error } = await supabase
     .from("discount_action_brands")
     .select(
-      "brand_id, brands(name), discount_actions!inner(id, title, marketplace_id, start_date, end_date, marketplaces(name))",
+      "brand_id, brands(name), discount_actions!inner(id, title, marketplace_id, start_date, end_date, status, marketplaces(name))",
     )
     .in("brand_id", brandIds)
     .lte("discount_actions.start_date", input.endDate)
@@ -287,6 +369,7 @@ export async function findActionConflicts(
       startDate: existing.start_date,
       endDate: existing.end_date,
       sameChannel: existing.marketplace_id === input.marketplaceId,
+      status: existing.status,
     });
   }
 
@@ -312,6 +395,7 @@ export async function deleteAction(id: string): Promise<ActionResult> {
   }
 
   revalidatePath(PATH);
+  revalidatePath(CALENDAR_PATH);
   return { ok: true };
 }
 

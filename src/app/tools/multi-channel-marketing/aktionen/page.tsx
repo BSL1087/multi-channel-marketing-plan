@@ -19,6 +19,9 @@ type ActionRow = {
   start_date: string;
   end_date: string;
   comment: string | null;
+  status: "draft" | "confirmed";
+  confirmed_at: string | null;
+  confirmed_by_email: string | null;
   marketplaces: { name: string } | { name: string }[] | null;
   discount_action_brands:
     | { discount_value: string; brands: BrandJoin | BrandJoin[] | null }[]
@@ -51,7 +54,7 @@ export default async function ActionsPage() {
       supabase
         .from("discount_actions")
         .select(
-          "id, title, marketplace_id, start_date, end_date, comment, marketplaces(name), discount_action_brands(discount_value, brands(id, name, color))",
+          "id, title, marketplace_id, start_date, end_date, comment, status, confirmed_at, confirmed_by_email, marketplaces(name), discount_action_brands(discount_value, brands(id, name, color))",
         )
         .order("start_date", { ascending: false })
         .returns<ActionRow[]>(),
@@ -86,6 +89,9 @@ export default async function ActionsPage() {
       comment: a.comment,
       marketplace_name: mp?.name ?? "—",
       brands,
+      status: a.status,
+      confirmed_at: a.confirmed_at,
+      confirmed_by_email: a.confirmed_by_email,
     };
   });
 

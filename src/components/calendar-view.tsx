@@ -99,11 +99,14 @@ export function CalendarView({
   channels,
   actions,
   brands,
+  draftCount = 0,
 }: {
   year: number;
   channels: Option[];
   actions: DiscountAction[];
   brands: BrandOption[];
+  /** Drafts exist but are never drawn here (PROJ-13) — only mentioned. */
+  draftCount?: number;
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -315,6 +318,23 @@ export function CalendarView({
         actions.length === 0 && (
           <p className="mt-4 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
             Keine Aktionen in {year}. Lege eine Aktion an oder wechsle das Jahr.
+            {/* An empty calendar despite existing drafts looks like data loss. */}
+            {draftCount > 0 && (
+              <>
+                {" "}
+                {draftCount === 1
+                  ? "1 Entwurf liegt"
+                  : `${draftCount} Entwürfe liegen`}{" "}
+                in der{" "}
+                <Link
+                  href="/tools/multi-channel-marketing/aktionen"
+                  className="underline underline-offset-2"
+                >
+                  Aktions-Verwaltung
+                </Link>{" "}
+                und erscheinen hier, sobald sie übernommen wurden.
+              </>
+            )}
           </p>
         )
       )}
@@ -507,6 +527,7 @@ export function CalendarView({
       )}
 
       <ActionFormDialog
+        origin="calendar"
         open={formOpen}
         onOpenChange={setFormOpen}
         action={editing}

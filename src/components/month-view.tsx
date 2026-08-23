@@ -471,6 +471,7 @@ export function MonthView({
       )}
 
       <ActionFormDialog
+        origin="calendar"
         open={formOpen}
         onOpenChange={setFormOpen}
         action={editing}

@@ -52,6 +52,12 @@ function ConflictList({ conflicts }: { conflicts: ActionConflict[] }) {
           </span>
           <div className="text-xs text-muted-foreground">
             Aktion: {c.actionTitle}
+            {/* A draft is planned, not booked — worth knowing before deciding. */}
+            {c.status === "draft" && (
+              <span className="ml-1 rounded border px-1 py-0.5 text-[10px] uppercase tracking-wide">
+                Entwurf
+              </span>
+            )}
           </div>
         </li>
       ))}

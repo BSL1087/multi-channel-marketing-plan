@@ -1,13 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const createAction = vi.fn(async () => ({ ok: true as const }));
+const createAction = vi.fn(async (..._args: unknown[]) => ({ ok: true as const }));
 const updateAction = vi.fn(async () => ({ ok: true as const }));
 const findActionConflicts = vi.fn(async () => ({
   ok: true as const,
   conflicts: [],
 }));
 const deleteAction = vi.fn(async () => ({ ok: true as const }));
+const setActionStatus = vi.fn(async () => ({ ok: true as const }));
 
 // Server actions can't run in jsdom — stub the whole module.
 vi.mock("@/app/tools/multi-channel-marketing/aktionen/actions", () => ({
@@ -16,6 +17,7 @@ vi.mock("@/app/tools/multi-channel-marketing/aktionen/actions", () => ({
   findActionConflicts: (...args: unknown[]) =>
     findActionConflicts(...(args as [])),
   deleteAction: (...args: unknown[]) => deleteAction(...(args as [])),
+  setActionStatus: (...args: unknown[]) => setActionStatus(...(args as [])),
 }));
 
 vi.mock("sonner", () => ({
@@ -25,7 +27,11 @@ vi.mock("sonner", () => ({
 import { ActionFormDialog } from "@/components/action-form-dialog";
 
 const channels = [
-  { id: "223e4567-e89b-12d3-a456-426614174001", name: "Amazon", type: "marketplace" as const },
+  {
+    id: "223e4567-e89b-12d3-a456-426614174001",
+    name: "Amazon",
+    type: "marketplace" as const,
+  },
 ];
 
 const brands = [
@@ -53,14 +59,75 @@ function renderDialog() {
   );
 }
 
+/** Renders the dialog in edit mode for an existing action. */
+function renderEdit(status: "draft" | "confirmed" = "confirmed") {
+  return render(
+    <ActionFormDialog
+      open
+      onOpenChange={() => {}}
+      action={{
+        id: "aaa",
+        title: "Sommer-Sale",
+        marketplace_id: channels[0].id,
+        start_date: "2026-03-01",
+        end_date: "2026-03-05",
+        comment: null,
+        marketplace_name: "Amazon",
+        status,
+        confirmed_at: null,
+        confirmed_by_email: null,
+        brands: [
+          {
+            id: brands[0].id,
+            name: brands[0].name,
+            color: "#ff0000",
+            discount_value: "20%",
+          },
+          {
+            id: brands[1].id,
+            name: brands[1].name,
+            color: "#00ff00",
+            discount_value: "10€",
+          },
+        ],
+      }}
+      brands={brands}
+      channels={channels}
+    />,
+  );
+}
+
 /** The per-brand discount input, addressed by its accessible label. */
 function discountInput(brandName: string): HTMLInputElement {
-  return screen.getByLabelText(`Rabattwert für ${brandName}`) as HTMLInputElement;
+  return screen.getByLabelText(
+    `Rabattwert für ${brandName}`,
+  ) as HTMLInputElement;
 }
 
 function checkbox(brandName: string): HTMLElement {
   // Each row is "checkbox + name" inside one label.
   return screen.getByRole("checkbox", { name: brandName });
+}
+
+/**
+ * Picks the channel in the Radix Select. It opens on keyboard interaction,
+ * which works in jsdom — a plain click does not (no real pointer events).
+ */
+async function selectChannel(name: string) {
+  const trigger = screen.getByRole("combobox");
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  const option = await screen.findByRole("option", { name });
+  fireEvent.click(option);
+  await waitFor(() => expect(trigger.textContent).toContain(name));
+}
+
+/** Fills everything the form needs for a valid save. */
+async function fillValidForm() {
+  fireEvent.change(screen.getByLabelText("Titel"), {
+    target: { value: "Sommer-Sale" },
+  });
+  await selectChannel("Amazon");
+  fireEvent.change(discountInput("Dooky"), { target: { value: "20%" } });
 }
 
 describe("ActionFormDialog — Rabattwert je Marke (PROJ-12)", () => {
@@ -119,9 +186,13 @@ describe("ActionFormDialog — Rabattwert je Marke (PROJ-12)", () => {
   it("refuses to save when a selected brand has no discount value", async () => {
     renderDialog();
 
-    fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "Sommer-Sale" } });
+    fireEvent.change(screen.getByLabelText("Titel"), {
+      target: { value: "Sommer-Sale" },
+    });
     fireEvent.click(checkbox("Dooky"));
-    fireEvent.click(screen.getByRole("button", { name: /speichern/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "In Kalender übernehmen" }),
+    );
 
     await waitFor(() =>
       expect(
@@ -132,29 +203,72 @@ describe("ActionFormDialog — Rabattwert je Marke (PROJ-12)", () => {
   });
 
   it("prefills each brand's own value when editing", () => {
-    render(
-      <ActionFormDialog
-        open
-        onOpenChange={() => {}}
-        action={{
-          id: "aaa",
-          title: "Sommer-Sale",
-          marketplace_id: channels[0].id,
-          start_date: "2026-03-01",
-          end_date: "2026-03-05",
-          comment: null,
-          marketplace_name: "Amazon",
-          brands: [
-            { id: brands[0].id, name: brands[0].name, color: "#ff0000", discount_value: "20%" },
-            { id: brands[1].id, name: brands[1].name, color: "#00ff00", discount_value: "10€" },
-          ],
-        }}
-        brands={brands}
-        channels={channels}
-      />,
-    );
+    renderEdit();
 
     expect(discountInput("Dooky").value).toBe("20%");
     expect(discountInput("Tega").value).toBe("10€");
+  });
+});
+
+describe("ActionFormDialog — Entwurf & Freigabe (PROJ-13)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("offers both save paths when creating", () => {
+    renderDialog();
+    expect(
+      screen.getByRole("button", { name: "Als Entwurf speichern" }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "In Kalender übernehmen" }),
+    ).toBeDefined();
+  });
+
+  it("saves as a draft when the draft button is used", async () => {
+    renderDialog();
+    await fillValidForm();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Als Entwurf speichern" }),
+    );
+
+    await waitFor(() => expect(createAction).toHaveBeenCalled());
+    // The status travels as the second argument, not as a form field.
+    expect((createAction.mock.calls[0] as unknown[])[1]).toBe("draft");
+  });
+
+  it("saves straight into the calendar when that button is used", async () => {
+    renderDialog();
+    await fillValidForm();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "In Kalender übernehmen" }),
+    );
+
+    await waitFor(() => expect(createAction).toHaveBeenCalled());
+    expect((createAction.mock.calls[0] as unknown[])[1]).toBe("confirmed");
+  });
+
+  it("keeps a single save button when editing, so saving never changes the status", () => {
+    renderEdit();
+    expect(screen.getByRole("button", { name: "Speichern" })).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: "Als Entwurf speichern" }),
+    ).toBeNull();
+  });
+
+  it("offers committing a draft from the edit dialog", () => {
+    renderEdit("draft");
+    expect(
+      screen.getByRole("button", { name: "In Kalender übernehmen" }),
+    ).toBeDefined();
+  });
+
+  it("does not offer committing an action that is already in the calendar", () => {
+    renderEdit("confirmed");
+    expect(
+      screen.queryByRole("button", { name: "In Kalender übernehmen" }),
+    ).toBeNull();
   });
 });

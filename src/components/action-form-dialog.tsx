@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Trash2 } from "lucide-react";
+import { CalendarCheck, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -11,10 +11,12 @@ import {
   findActionConflicts,
   updateAction,
   type ActionConflict,
+  type ActionStatus,
   type DiscountAction,
 } from "@/app/tools/multi-channel-marketing/aktionen/actions";
 import { ConflictWarningDialog } from "@/components/conflict-warning-dialog";
 import { DeleteActionDialog } from "@/components/delete-action-dialog";
+import { ActionStatusDialog } from "@/components/action-status-dialog";
 import {
   actionSchema,
   type ActionFormValues,
@@ -71,6 +73,12 @@ type ActionFormDialogProps = {
   defaultEndDate?: string;
   /** Called after a successful save (e.g. to refresh the calendar). */
   onSuccess?: () => void;
+  /**
+   * Where the dialog was opened from. Saving a draft in the calendar produces
+   * nothing visible there (drafts live in the action management page), so that
+   * case gets an explaining toast with a link (PROJ-13).
+   */
+  origin?: "list" | "calendar";
 };
 
 function today(): string {
@@ -106,6 +114,7 @@ export function ActionFormDialog({
   defaultStartDate,
   defaultEndDate,
   onSuccess,
+  origin = "list",
 }: ActionFormDialogProps) {
   const isEdit = action !== null;
   const brandGroups = useMemo(() => groupBrands(brands), [brands]);
@@ -119,6 +128,12 @@ export function ActionFormDialog({
   const [pending, setPending] = useState<ActionFormValues | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Which save button was pressed (PROJ-13). A ref, not state: the value is
+  // read inside the submit handler that the very same click triggers, before
+  // a state update would have been applied.
+  const saveAsRef = useRef<ActionStatus>("confirmed");
 
   // Typed discount values per brand, including brands that are currently
   // unchecked: unchecking must not wipe what was entered (PROJ-12). The form
@@ -177,16 +192,41 @@ export function ActionFormDialog({
       endDate: values.endDate,
       comment: values.comment ?? "",
     };
+    // Editing never changes the status — that is a separate, deliberate step.
+    const status = saveAsRef.current;
     const result = isEdit
       ? await updateAction(action.id, payload)
-      : await createAction(payload);
+      : await createAction(payload, status);
 
     if (!result.ok) {
       toast.error(result.message);
       return false;
     }
 
-    toast.success(isEdit ? "Aktion gespeichert." : "Aktion angelegt.");
+    if (isEdit) {
+      toast.success("Aktion gespeichert.");
+    } else if (status === "draft") {
+      // Saved from the calendar, a draft appears nowhere on screen — say where
+      // it went instead of leaving the user staring at an unchanged calendar.
+      toast.success("Als Entwurf gespeichert.", {
+        description:
+          origin === "calendar"
+            ? "Der Entwurf liegt unter „Rabatt-Aktionen verwalten“ und erscheint im Kalender, sobald er übernommen wurde."
+            : "Er erscheint im Kalender, sobald er übernommen wurde.",
+        action:
+          origin === "calendar"
+            ? {
+                label: "Zu den Aktionen",
+                onClick: () => {
+                  window.location.href =
+                    "/tools/multi-channel-marketing/aktionen";
+                },
+              }
+            : undefined,
+      });
+    } else {
+      toast.success("Aktion angelegt.");
+    }
     onSuccess?.();
     setConflictOpen(false);
     setPending(null);
@@ -523,10 +563,52 @@ export function ActionFormDialog({
                   Aktion löschen
                 </Button>
               )}
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Speichern
-              </Button>
+              {isEdit ? (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {action.status === "draft" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setConfirmOpen(true)}
+                      disabled={isSubmitting}
+                    >
+                      <CalendarCheck className="h-4 w-4" />
+                      In Kalender übernehmen
+                    </Button>
+                  )}
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                    Speichern
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      saveAsRef.current = "draft";
+                    }}
+                  >
+                    Als Entwurf speichern
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      saveAsRef.current = "confirmed";
+                    }}
+                  >
+                    {isSubmitting && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                    In Kalender übernehmen
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </form>
         </Form>
@@ -552,6 +634,19 @@ export function ActionFormDialog({
         action={action}
         onSuccess={() => {
           // Close the edit dialog too and let the caller refresh (calendar).
+          onSuccess?.();
+          onOpenChange(false);
+        }}
+      />
+    )}
+
+    {isEdit && (
+      <ActionStatusDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        action={action}
+        target="confirmed"
+        onSuccess={() => {
           onSuccess?.();
           onOpenChange(false);
         }}

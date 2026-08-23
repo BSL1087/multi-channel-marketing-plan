@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarPlus, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarCheck, CalendarPlus, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 
-import type { DiscountAction } from "@/app/tools/multi-channel-marketing/aktionen/actions";
+import type {
+  ActionStatus as WorkflowStatus,
+  DiscountAction,
+} from "@/app/tools/multi-channel-marketing/aktionen/actions";
+import { Badge } from "@/components/ui/badge";
+import { ActionStatusDialog } from "@/components/action-status-dialog";
 import { cn } from "@/lib/utils";
 import type { ChannelType } from "@/lib/channel-validation";
 import { Button } from "@/components/ui/button";
@@ -65,6 +70,18 @@ const STATUS_META: Record<
 
 const STATUS_ORDER: ActionStatus[] = ["active", "upcoming", "expired"];
 
+/** Tooltip for the "Im Kalender" badge: who committed the action, and when. */
+function confirmedTitle(action: DiscountAction): string | undefined {
+  if (!action.confirmed_at) return undefined;
+  const date = formatDate(action.confirmed_at.slice(0, 10));
+  return action.confirmed_by_email
+    ? `Übernommen von ${action.confirmed_by_email} am ${date}`
+    : `Übernommen am ${date}`;
+}
+
+/** The draft/calendar filter above the table. */
+type StatusFilter = "all" | "draft" | "confirmed";
+
 export function ActionManager({
   actions,
   brands,
@@ -77,6 +94,18 @@ export function ActionManager({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<DiscountAction | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DiscountAction | null>(null);
+  const [statusTarget, setStatusTarget] = useState<{
+    action: DiscountAction;
+    target: WorkflowStatus;
+  } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const draftCount = actions.filter((a) => a.status === "draft").length;
+  const confirmedCount = actions.length - draftCount;
+  const visibleActions =
+    statusFilter === "all"
+      ? actions
+      : actions.filter((a) => a.status === statusFilter);
 
   // Resolved after mount so the status colours use the viewer's local date and
   // never cause a server/client hydration mismatch.
@@ -159,6 +188,31 @@ export function ActionManager({
         </Button>
       </div>
 
+      {actions.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground">
+            Anzeigen:
+          </span>
+          {(
+            [
+              ["all", `Alle (${actions.length})`],
+              ["draft", `Entwürfe (${draftCount})`],
+              ["confirmed", `Im Kalender (${confirmedCount})`],
+            ] as [StatusFilter, string][]
+          ).map(([value, label]) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={statusFilter === value ? "secondary" : "ghost"}
+              onClick={() => setStatusFilter(value)}
+              aria-pressed={statusFilter === value}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      )}
+
       {actions.length === 0 ? (
         <div className="mt-4 flex flex-col items-center rounded-lg border border-dashed bg-background px-6 py-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -174,6 +228,12 @@ export function ActionManager({
             Aktion hinzufügen
           </Button>
         </div>
+      ) : visibleActions.length === 0 ? (
+        <p className="mt-4 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          {statusFilter === "draft"
+            ? "Keine Entwürfe vorhanden."
+            : "Keine Aktion ist im Kalender."}
+        </p>
       ) : (
         <div className="mt-4 rounded-lg border bg-background">
           <Table>
@@ -190,7 +250,7 @@ export function ActionManager({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {actions.map((action) => {
+              {visibleActions.map((action) => {
                 const status = todayIso
                   ? getStatus(action.start_date, action.end_date, todayIso)
                   : null;
@@ -208,7 +268,24 @@ export function ActionManager({
                     />
                     <span className="sr-only">{meta?.label ?? ""}</span>
                   </TableCell>
-                  <TableCell className="font-medium">{action.title}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="flex flex-wrap items-center gap-2">
+                      {action.title}
+                      {action.status === "draft" ? (
+                        <Badge variant="outline" className="font-normal">
+                          Entwurf
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="font-normal"
+                          title={confirmedTitle(action)}
+                        >
+                          Im Kalender
+                        </Badge>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <span className="flex flex-col items-start gap-1">
                       {action.brands.map((brand) => (
@@ -237,6 +314,27 @@ export function ActionManager({
                   </TableCell>
 
                   <TableCell className="w-px whitespace-nowrap py-2 text-right">
+                    {action.status === "draft" ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`„${action.title}" in den Kalender übernehmen`}
+                        title="In Kalender übernehmen"
+                        onClick={() => setStatusTarget({ action, target: "confirmed" })}
+                      >
+                        <CalendarCheck className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`„${action.title}" zurück auf Entwurf setzen`}
+                        title="Zurück auf Entwurf"
+                        onClick={() => setStatusTarget({ action, target: "draft" })}
+                      >
+                        <Undo2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -271,6 +369,14 @@ export function ActionManager({
         action={editing}
         brands={brands}
         channels={channels}
+      />
+      <ActionStatusDialog
+        open={statusTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setStatusTarget(null);
+        }}
+        action={statusTarget?.action ?? null}
+        target={statusTarget?.target ?? "confirmed"}
       />
       <DeleteActionDialog
         open={deleteTarget !== null}

@@ -78,13 +78,20 @@ export default async function CalendarPage({
   const rangeStart = monthMode ? `${year}-${mm}-01` : `${year}-01-01`;
   const rangeEnd = monthMode ? `${year}-${mm}-${dd}` : `${year}-12-31`;
 
-  const [{ data: actionRows }, { data: channels }, { data: brandRows }] =
-    await Promise.all([
+  const [
+    { data: actionRows },
+    { data: channels },
+    { data: brandRows },
+    { count: draftCount },
+  ] = await Promise.all([
       supabase
         .from("discount_actions")
         .select(
           "id, title, marketplace_id, start_date, end_date, comment, marketplaces(name), discount_action_brands(discount_value, brands(id, name, color))",
         )
+        // PROJ-13: the calendar is the binding year view — drafts live in the
+        // action management page only and never reach this query.
+        .eq("status", "confirmed")
         .lte("start_date", rangeEnd)
         .gte("end_date", rangeStart)
         .returns<ActionRow[]>(),
@@ -98,6 +105,14 @@ export default async function CalendarPage({
         .select("id, name, color, product_groups(name)")
         .order("name")
         .returns<BrandRow[]>(),
+      // Drafts never appear in the calendar, but an empty year view should say
+      // that some exist rather than look like everything vanished (PROJ-13).
+      supabase
+        .from("discount_actions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "draft")
+        .lte("start_date", rangeEnd)
+        .gte("end_date", rangeStart),
     ]);
 
   const actions: DiscountAction[] = (actionRows ?? []).map((a) => {
@@ -119,6 +134,11 @@ export default async function CalendarPage({
       comment: a.comment,
       marketplace_name: mp?.name ?? "—",
       brands: actionBrands,
+      // Everything reaching the calendar is confirmed by definition; the
+      // approval details are only shown in the action management page.
+      status: "confirmed" as const,
+      confirmed_at: null,
+      confirmed_by_email: null,
     };
   });
 
@@ -168,6 +188,7 @@ export default async function CalendarPage({
             channels={channels ?? []}
             actions={actions}
             brands={brands}
+            draftCount={draftCount ?? 0}
           />
         )}
       </main>
