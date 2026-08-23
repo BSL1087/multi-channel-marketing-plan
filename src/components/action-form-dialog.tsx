@@ -19,6 +19,7 @@ import {
   actionSchema,
   type ActionFormValues,
 } from "@/lib/action-validation";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -119,15 +120,21 @@ export function ActionFormDialog({
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  // Typed discount values per brand, including brands that are currently
+  // unchecked: unchecking must not wipe what was entered (PROJ-12). The form
+  // value itself only ever holds the CHECKED brands.
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  // "Same value for every selected brand" convenience field.
+  const [bulkValue, setBulkValue] = useState("");
+
   const form = useForm<ActionFormValues>({
     resolver: zodResolver(actionSchema),
     defaultValues: {
       title: "",
       marketplaceId: "",
-      brandIds: [],
+      brands: [],
       startDate: today(),
       endDate: today(),
-      discountValue: "",
       comment: "",
     },
   });
@@ -137,12 +144,21 @@ export function ActionFormDialog({
       form.reset({
         title: action?.title ?? "",
         marketplaceId: action?.marketplace_id ?? "",
-        brandIds: action?.brands.map((b) => b.id) ?? [],
+        brands:
+          action?.brands.map((b) => ({
+            brandId: b.id,
+            discountValue: b.discount_value,
+          })) ?? [],
         startDate: action?.start_date ?? defaultStartDate ?? today(),
         endDate: action?.end_date ?? defaultEndDate ?? today(),
-        discountValue: action?.discount_value ?? "",
         comment: action?.comment ?? "",
       });
+      setDraftValues(
+        Object.fromEntries(
+          action?.brands.map((b) => [b.id, b.discount_value]) ?? [],
+        ),
+      );
+      setBulkValue("");
     }
   }, [open, action, form, defaultStartDate, defaultEndDate]);
 
@@ -156,10 +172,9 @@ export function ActionFormDialog({
     const payload = {
       title: values.title,
       marketplaceId: values.marketplaceId,
-      brandIds: values.brandIds,
+      brands: values.brands,
       startDate: values.startDate,
       endDate: values.endDate,
-      discountValue: values.discountValue,
       comment: values.comment ?? "",
     };
     const result = isEdit
@@ -184,7 +199,7 @@ export function ActionFormDialog({
     // block the user — fall through and save (PROJ-7: "im Zweifel speicherbar").
     const check = await findActionConflicts({
       marketplaceId: values.marketplaceId,
-      brandIds: values.brandIds,
+      brandIds: values.brands.map((b) => b.brandId),
       startDate: values.startDate,
       endDate: values.endDate,
       excludeId: isEdit ? action.id : undefined,
@@ -226,7 +241,7 @@ export function ActionFormDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Aktion bearbeiten" : "Aktion hinzufügen"}
@@ -239,6 +254,7 @@ export function ActionFormDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}
               name="title"
@@ -292,18 +308,71 @@ export function ActionFormDialog({
                 </FormItem>
               )}
             />
+            </div>
 
             <FormField
               control={form.control}
-              name="brandIds"
-              render={({ field }) => (
+              name="brands"
+              render={({ field }) => {
+                const selected = new Set(field.value.map((b) => b.brandId));
+
+                /** Adds or removes a brand, keeping its typed value around. */
+                function setChecked(brandId: string, checked: boolean) {
+                  field.onChange(
+                    checked
+                      ? [
+                          ...field.value,
+                          {
+                            brandId,
+                            discountValue: draftValues[brandId] ?? "",
+                          },
+                        ]
+                      : field.value.filter((b) => b.brandId !== brandId),
+                  );
+                }
+
+                /** Typing a value implies "this brand too" — check it as well. */
+                function setValue(brandId: string, value: string) {
+                  setDraftValues((prev) => ({ ...prev, [brandId]: value }));
+                  field.onChange(
+                    selected.has(brandId)
+                      ? field.value.map((b) =>
+                          b.brandId === brandId
+                            ? { ...b, discountValue: value }
+                            : b,
+                        )
+                      : [...field.value, { brandId, discountValue: value }],
+                  );
+                }
+
+                /** Writes the bulk value into every currently selected brand. */
+                function applyBulk() {
+                  const value = bulkValue.trim();
+                  if (value.length === 0 || field.value.length === 0) return;
+                  setDraftValues((prev) => {
+                    const next = { ...prev };
+                    for (const b of field.value) next[b.brandId] = value;
+                    return next;
+                  });
+                  field.onChange(
+                    field.value.map((b) => ({ ...b, discountValue: value })),
+                  );
+                }
+
+                const missing = field.value.filter(
+                  (b) => b.discountValue.trim().length === 0,
+                ).length;
+                const showMissing =
+                  form.formState.isSubmitted && missing > 0;
+
+                return (
                 <FormItem>
-                  <FormLabel>Marken</FormLabel>
+                  <FormLabel>Marken & Rabatt</FormLabel>
                   <FormDescription>
-                    Wähle alle Marken, die diese Aktion betrifft – gruppiert nach
-                    Produktgruppe.
+                    Wähle alle Marken, die diese Aktion betrifft, und trage je
+                    Marke ihren Rabattwert ein – gruppiert nach Produktgruppe.
                   </FormDescription>
-                  <div className="max-h-56 space-y-3 overflow-y-auto rounded-md border p-2">
+                  <div className="max-h-64 space-y-3 overflow-y-auto rounded-md border p-2">
                     {brandGroups.map((g) => (
                       <div key={g.group}>
                         <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -311,36 +380,85 @@ export function ActionFormDialog({
                         </p>
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                           {g.items.map((b) => {
-                            const checked = field.value.includes(b.id);
+                            const checked = selected.has(b.id);
+                            const value = draftValues[b.id] ?? "";
+                            const invalid =
+                              showMissing && checked && value.trim().length === 0;
                             return (
-                              <label
+                              <div
                                 key={b.id}
-                                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+                                className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
                               >
-                                <Checkbox
-                                  checked={checked}
+                                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                                  <Checkbox
+                                    checked={checked}
+                                    disabled={isSubmitting}
+                                    onCheckedChange={(next) =>
+                                      setChecked(b.id, next === true)
+                                    }
+                                  />
+                                  <span className="truncate" title={b.name}>
+                                    {b.name}
+                                  </span>
+                                </label>
+                                <Input
+                                  value={value}
+                                  onChange={(e) =>
+                                    setValue(b.id, e.target.value)
+                                  }
+                                  maxLength={50}
+                                  placeholder="Rabatt"
                                   disabled={isSubmitting}
-                                  onCheckedChange={(value) => {
-                                    field.onChange(
-                                      value === true
-                                        ? [...field.value, b.id]
-                                        : field.value.filter(
-                                            (id) => id !== b.id,
-                                          ),
-                                    );
-                                  }}
+                                  aria-label={`Rabattwert für ${b.name}`}
+                                  aria-invalid={invalid}
+                                  className={cn(
+                                    "h-8 w-28 shrink-0 text-sm",
+                                    !checked && "opacity-50",
+                                    invalid && "border-destructive",
+                                  )}
                                 />
-                                {b.name}
-                              </label>
+                              </div>
                             );
                           })}
                         </div>
                       </div>
                     ))}
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={bulkValue}
+                      onChange={(e) => setBulkValue(e.target.value)}
+                      maxLength={50}
+                      placeholder="z.B. 20% oder 10€"
+                      disabled={isSubmitting}
+                      aria-label="Rabattwert für alle gewählten Marken"
+                      className="h-8 w-40 text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={applyBulk}
+                      disabled={
+                        isSubmitting ||
+                        bulkValue.trim().length === 0 ||
+                        field.value.length === 0
+                      }
+                    >
+                      Für alle gewählten übernehmen
+                    </Button>
+                  </div>
+                  {showMissing && (
+                    <p className="text-sm font-medium text-destructive">
+                      {missing === 1
+                        ? "1 gewählte Marke ohne Rabattwert."
+                        : `${missing} gewählte Marken ohne Rabattwert.`}
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
-              )}
+                );
+              }}
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -372,25 +490,6 @@ export function ActionFormDialog({
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="discountValue"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rabattwert</FormLabel>
-                  <FormControl>
-                    <Input
-                      maxLength={50}
-                      placeholder="z.B. 20% oder 10€"
-                      disabled={isSubmitting}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}

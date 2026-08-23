@@ -11,6 +11,8 @@ export type ActionBrand = {
   id: string;
   name: string;
   color: string;
+  /** This brand's own discount value within the action (PROJ-12). */
+  discount_value: string;
 };
 
 export type DiscountAction = {
@@ -19,20 +21,24 @@ export type DiscountAction = {
   marketplace_id: string;
   start_date: string;
   end_date: string;
-  discount_value: string;
   comment: string | null;
   marketplace_name: string;
-  /** One or more brands involved in this action (PROJ-5 multi-brand). */
+  /** One or more brands involved in this action, each with its own value. */
   brands: ActionBrand[];
+};
+
+/** One selected brand plus the discount value entered for it. */
+export type ActionBrandInput = {
+  brandId: string;
+  discountValue: string;
 };
 
 export type ActionInput = {
   title: string;
   marketplaceId: string;
-  brandIds: string[];
+  brands: ActionBrandInput[];
   startDate: string;
   endDate: string;
-  discountValue: string;
   comment?: string;
 };
 
@@ -44,10 +50,9 @@ function validate(input: ActionInput) {
   return actionSchema.safeParse({
     title: input.title,
     marketplaceId: input.marketplaceId,
-    brandIds: input.brandIds,
+    brands: input.brands,
     startDate: input.startDate,
     endDate: input.endDate,
-    discountValue: input.discountValue,
     comment: input.comment ?? "",
   });
 }
@@ -59,14 +64,24 @@ function toRow(input: ActionInput) {
     marketplace_id: input.marketplaceId,
     start_date: input.startDate,
     end_date: input.endDate,
-    discount_value: input.discountValue.trim(),
     comment: comment.length > 0 ? comment : null,
   };
 }
 
-/** De-duplicates the selected brand ids (a brand can only be linked once). */
-function uniqueBrandIds(input: ActionInput): string[] {
-  return [...new Set(input.brandIds)];
+/**
+ * De-duplicates the selected brands (a brand can only be linked once per
+ * action). If the same brand appears twice, the last entry wins — the form
+ * cannot produce that, but a direct server call could.
+ */
+function uniqueBrands(input: ActionInput): ActionBrandInput[] {
+  const byId = new Map<string, ActionBrandInput>();
+  for (const brand of input.brands) {
+    byId.set(brand.brandId, {
+      brandId: brand.brandId,
+      discountValue: brand.discountValue.trim(),
+    });
+  }
+  return [...byId.values()];
 }
 
 /** Normalises a PostgREST embedded relation that may come back as object or array. */
@@ -95,9 +110,10 @@ export async function createAction(input: ActionInput): Promise<ActionResult> {
     return { ok: false, message: "Aktion konnte nicht angelegt werden." };
   }
 
-  const links = uniqueBrandIds(input).map((brandId) => ({
+  const links = uniqueBrands(input).map((brand) => ({
     action_id: created.id,
-    brand_id: brandId,
+    brand_id: brand.brandId,
+    discount_value: brand.discountValue,
   }));
   const { error: linkError } = await supabase
     .from("discount_action_brands")
@@ -139,16 +155,22 @@ export async function updateAction(
     return { ok: false, message: "Diese Aktion existiert nicht mehr." };
   }
 
-  // Sync the brand assignments. Add the new set first (upsert ignores links
-  // that already exist), THEN remove links no longer selected. Doing it in this
-  // order guarantees the action never momentarily has zero brands — otherwise
-  // the "delete action when no brands" trigger would remove it during an edit.
-  const brandIds = uniqueBrandIds(input);
+  // Sync the brand assignments. Write the new set first, THEN remove links no
+  // longer selected. Doing it in this order guarantees the action never
+  // momentarily has zero brands — otherwise the "delete action when no brands"
+  // trigger would remove it during an edit.
+  // `ignoreDuplicates: false` is required since PROJ-12: an existing link must
+  // be UPDATED when only its discount value changed, not silently skipped.
+  const brands = uniqueBrands(input);
   const { error: upsertError } = await supabase
     .from("discount_action_brands")
     .upsert(
-      brandIds.map((brandId) => ({ action_id: id, brand_id: brandId })),
-      { onConflict: "action_id,brand_id", ignoreDuplicates: true },
+      brands.map((brand) => ({
+        action_id: id,
+        brand_id: brand.brandId,
+        discount_value: brand.discountValue,
+      })),
+      { onConflict: "action_id,brand_id", ignoreDuplicates: false },
     );
   if (upsertError) {
     return { ok: false, message: "Aktion konnte nicht gespeichert werden." };
@@ -157,7 +179,7 @@ export async function updateAction(
     .from("discount_action_brands")
     .delete()
     .eq("action_id", id)
-    .not("brand_id", "in", `(${brandIds.join(",")})`);
+    .not("brand_id", "in", `(${brands.map((b) => b.brandId).join(",")})`);
   if (pruneError) {
     return { ok: false, message: "Aktion konnte nicht gespeichert werden." };
   }

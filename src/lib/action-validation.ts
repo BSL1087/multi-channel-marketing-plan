@@ -26,6 +26,18 @@ const isoDateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Bitte ein gültiges Datum wählen." });
 
 /**
+ * One selected brand together with its own discount value (PROJ-12). The value
+ * belongs to the action<->brand pairing, not to the action, so every selected
+ * brand carries its own — there is no action-level fallback.
+ */
+export const actionBrandSchema = z.object({
+  brandId: z.string().uuid({ message: "Bitte gültige Marken auswählen." }),
+  discountValue: discountValueSchema,
+});
+
+export type ActionBrandValues = z.infer<typeof actionBrandSchema>;
+
+/**
  * Full action payload. The cross-field rule (end >= start) is enforced via
  * `.refine` so both the form and the server reject an end-before-start range.
  */
@@ -33,12 +45,11 @@ export const actionSchema = z
   .object({
     title: actionTitleSchema,
     marketplaceId: z.string().uuid({ message: "Bitte einen Kanal auswählen." }),
-    brandIds: z
-      .array(z.string().uuid({ message: "Bitte gültige Marken auswählen." }))
+    brands: z
+      .array(actionBrandSchema)
       .min(1, { message: "Bitte mindestens eine Marke auswählen." }),
     startDate: isoDateSchema,
     endDate: isoDateSchema,
-    discountValue: discountValueSchema,
     comment: commentSchema.optional().or(z.literal("")),
   })
   .refine((data) => data.endDate >= data.startDate, {

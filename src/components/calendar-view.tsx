@@ -413,7 +413,7 @@ export function CalendarView({
                             {formatDate(item.end_date)}
                           </p>
                           <p className="text-xs">
-                            Rabatt: {item.action.discount_value}
+                            Rabatt: {item.brand.discount_value}
                           </p>
                           {item.action.comment && (
                             <p className="mt-1 text-xs italic text-muted-foreground">

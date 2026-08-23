@@ -20,11 +20,10 @@ type ActionRow = {
   marketplace_id: string;
   start_date: string;
   end_date: string;
-  discount_value: string;
   comment: string | null;
   marketplaces: { name: string } | { name: string }[] | null;
   discount_action_brands:
-    | { brands: BrandJoin | BrandJoin[] | null }[]
+    | { discount_value: string; brands: BrandJoin | BrandJoin[] | null }[]
     | null;
 };
 
@@ -84,7 +83,7 @@ export default async function CalendarPage({
       supabase
         .from("discount_actions")
         .select(
-          "id, title, marketplace_id, start_date, end_date, discount_value, comment, marketplaces(name), discount_action_brands(brands(id, name, color))",
+          "id, title, marketplace_id, start_date, end_date, comment, marketplaces(name), discount_action_brands(discount_value, brands(id, name, color))",
         )
         .lte("start_date", rangeEnd)
         .gte("end_date", rangeStart)
@@ -103,9 +102,13 @@ export default async function CalendarPage({
 
   const actions: DiscountAction[] = (actionRows ?? []).map((a) => {
     const mp = one(a.marketplaces);
+    // Each link carries its brand AND that brand's own discount value (PROJ-12).
     const actionBrands = (a.discount_action_brands ?? [])
-      .map((link) => one(link.brands))
-      .filter((b): b is BrandJoin => b !== null)
+      .map((link) => {
+        const brand = one(link.brands);
+        return brand ? { ...brand, discount_value: link.discount_value } : null;
+      })
+      .filter((b): b is BrandJoin & { discount_value: string } => b !== null)
       .sort((x, y) => x.name.localeCompare(y.name, "de"));
     return {
       id: a.id,
@@ -113,7 +116,6 @@ export default async function CalendarPage({
       marketplace_id: a.marketplace_id,
       start_date: a.start_date,
       end_date: a.end_date,
-      discount_value: a.discount_value,
       comment: a.comment,
       marketplace_name: mp?.name ?? "—",
       brands: actionBrands,

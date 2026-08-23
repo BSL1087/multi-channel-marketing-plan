@@ -183,10 +183,9 @@ export function ActionManager({
                   <span className="sr-only">Status</span>
                 </TableHead>
                 <TableHead>Titel</TableHead>
-                <TableHead>Marken</TableHead>
+                <TableHead>Marken & Rabatt</TableHead>
                 <TableHead>Kanal</TableHead>
                 <TableHead>Zeitraum</TableHead>
-                <TableHead>Rabatt</TableHead>
                 <TableHead className="w-px" />
               </TableRow>
             </TableHeader>
@@ -223,6 +222,9 @@ export function ActionManager({
                             aria-hidden
                           />
                           {brand.name}
+                          <span className="font-medium">
+                            {brand.discount_value}
+                          </span>
                         </span>
                       ))}
                     </span>
@@ -233,7 +235,7 @@ export function ActionManager({
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {formatRange(action.start_date, action.end_date)}
                   </TableCell>
-                  <TableCell>{action.discount_value}</TableCell>
+
                   <TableCell className="w-px whitespace-nowrap py-2 text-right">
                     <Button
                       variant="ghost"

@@ -14,10 +14,9 @@ function validInput(overrides: Record<string, unknown> = {}) {
   return {
     title: "Sommer-Sale",
     marketplaceId: CHANNEL,
-    brandIds: [BRAND],
+    brands: [{ brandId: BRAND, discountValue: "20%" }],
     startDate: "2026-03-01",
     endDate: "2026-03-05",
-    discountValue: "20%",
     comment: "",
     ...overrides,
   };
@@ -72,21 +71,58 @@ describe("actionSchema", () => {
       false,
     );
     expect(
-      actionSchema.safeParse(validInput({ brandIds: ["nope"] })).success,
+      actionSchema.safeParse(
+        validInput({ brands: [{ brandId: "nope", discountValue: "20%" }] }),
+      ).success,
     ).toBe(false);
   });
 
   it("requires at least one brand", () => {
-    expect(actionSchema.safeParse(validInput({ brandIds: [] })).success).toBe(
+    expect(actionSchema.safeParse(validInput({ brands: [] })).success).toBe(
       false,
     );
   });
 
-  it("accepts multiple brands", () => {
+  it("accepts multiple brands with different discount values", () => {
     const SECOND = "323e4567-e89b-12d3-a456-426614174002";
+    const r = actionSchema.safeParse(
+      validInput({
+        brands: [
+          { brandId: BRAND, discountValue: "20%" },
+          { brandId: SECOND, discountValue: "10€" },
+        ],
+      }),
+    );
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.brands[1].discountValue).toBe("10€");
+  });
+
+  it("rejects a selected brand without a discount value (PROJ-12)", () => {
     expect(
-      actionSchema.safeParse(validInput({ brandIds: [BRAND, SECOND] })).success,
-    ).toBe(true);
+      actionSchema.safeParse(
+        validInput({
+          brands: [
+            { brandId: BRAND, discountValue: "20%" },
+            { brandId: "323e4567-e89b-12d3-a456-426614174002", discountValue: "  " },
+          ],
+        }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it("rejects a discount value over 50 chars and trims it otherwise", () => {
+    expect(
+      actionSchema.safeParse(
+        validInput({
+          brands: [{ brandId: BRAND, discountValue: "y".repeat(51) }],
+        }),
+      ).success,
+    ).toBe(false);
+
+    const r = actionSchema.safeParse(
+      validInput({ brands: [{ brandId: BRAND, discountValue: "  20%  " }] }),
+    );
+    expect(r.success && r.data.brands[0].discountValue).toBe("20%");
   });
 
   it("rejects a malformed date", () => {
