@@ -86,7 +86,11 @@ export function ChannelManager({ channels }: { channels: Channel[] }) {
                       <TableCell className="font-medium">
                         {channel.name}
                       </TableCell>
-                      <TableCell className="py-2">
+                      {/* Diese Spalte nimmt den freien Platz ein; linksbündig
+                          wirkt das Badge dadurch zufällig in der Zeile
+                          platziert. Zentriert steht es sauber unter den
+                          Badges der anderen Zeilen. */}
+                      <TableCell className="py-2 text-center">
                         <Badge
                           variant="outline"
                           className={CHANNEL_TYPE_STYLES[channel.type].badge}
