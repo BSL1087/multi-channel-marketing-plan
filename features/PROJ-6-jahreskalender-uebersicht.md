@@ -290,5 +290,27 @@ Die Einheit ist die **Marke**, nicht der Aktionszeitraum — eine Aktion mit vie
 
 **Verifikation:** `tsc --noEmit` ✓, `next build` ✓, `npm test` (66 Tests, davon 8 in `src/lib/calendar-layout.test.ts`) ✓.
 
+
+## Kategorie-Gruppierung im Kalender (2026-08-21)
+
+Erweiterung des obigen Filters um eine dritte Kanal-Kategorie **„Händler"**
+(`retailer`) und um eine kategorie-basierte Gliederung. Details und die zentralen
+Helfer stehen in PROJ-3 („Erweiterung: Kanal-Kategorien").
+
+**Auswirkungen auf Jahres- und Monatsansicht:**
+- **Eine** Kalender-Ansicht bleibt bestehen; die Kategorien sind Abschnitte darin.
+  Reihenfolge: Marketplaces → eigene Webshops → Händler, **innerhalb** einer
+  Kategorie alphabetisch. Die Sortierung hängt nicht mehr am Namen — die
+  Behelfs-Präfixe „WS-" sind nicht mehr nötig.
+- Jede Kategorie beginnt mit einer farbigen Kopfzeile (inkl. Anzahl); die
+  Kanal-Spalte der Zeilen darunter trägt dieselbe Farbe in hell:
+  Marketplaces blau, eigene Webshops grün, Händler orange.
+- Der Filter im Jahreskalender hat jetzt **drei** Checkboxen (je Kategorie, mit
+  Farbpunkt und Anzahl); leere Kategorien erzeugen keine Kopfzeile.
+- Die Monats-Detailansicht (PROJ-8) übernimmt Gruppierung und Farben, hat aber
+  weiterhin **keinen** eigenen Filter — das bleibt offen.
+- Auch das Kanal-Dropdown im Aktions-Dialog und die Kanal-Verwaltung sind nach
+  Kategorie gruppiert, damit die Reihenfolge überall gleich ist.
+
 ## Deployment
 _To be added by /deploy_

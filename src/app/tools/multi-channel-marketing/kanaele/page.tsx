@@ -42,8 +42,8 @@ export default async function ChannelsPage() {
           Kanäle verwalten
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Marketplaces &amp; eigene Webshops, auf denen ihr Rabatt-Aktionen
-          plant.
+          Marketplaces, eigene Webshops &amp; Händler, auf denen ihr
+          Rabatt-Aktionen plant.
         </p>
 
         <ChannelManager channels={channels ?? []} />

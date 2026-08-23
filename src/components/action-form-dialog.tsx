@@ -43,12 +43,18 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  groupChannelsByType,
+  type ChannelType,
+} from "@/lib/channel-validation";
 
-type Option = { id: string; name: string };
+type Option = { id: string; name: string; type: ChannelType };
 type BrandOption = { id: string; name: string; product_group_name: string };
 
 type ActionFormDialogProps = {
@@ -102,6 +108,8 @@ export function ActionFormDialog({
 }: ActionFormDialogProps) {
   const isEdit = action !== null;
   const brandGroups = useMemo(() => groupBrands(brands), [brands]);
+  // Same order as the calendars: by category, alphabetical inside a category.
+  const channelGroups = useMemo(() => groupChannelsByType(channels), [channels]);
 
   // Conflict warning flow (PROJ-7): hold the validated values while the warning
   // dialog is open so "Trotzdem speichern" can save exactly what was entered.
@@ -268,10 +276,15 @@ export function ActionFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {channels.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
+                      {channelGroups.map((g) => (
+                        <SelectGroup key={g.type}>
+                          <SelectLabel>{g.label}</SelectLabel>
+                          {g.items.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       ))}
                     </SelectContent>
                   </Select>

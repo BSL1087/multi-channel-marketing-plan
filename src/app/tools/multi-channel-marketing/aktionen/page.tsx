@@ -5,7 +5,10 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ActionManager } from "@/components/action-manager";
+import type { ChannelType } from "@/lib/channel-validation";
 import type { DiscountAction } from "./actions";
+
+type ChannelOption = { id: string; name: string; type: ChannelType };
 
 type BrandJoin = { id: string; name: string; color: string };
 
@@ -60,8 +63,9 @@ export default async function ActionsPage() {
         .returns<BrandRow[]>(),
       supabase
         .from("marketplaces")
-        .select("id, name")
-        .order("name", { ascending: true }),
+        .select("id, name, type")
+        .order("name", { ascending: true })
+        .returns<ChannelOption[]>(),
     ]);
 
   const actions: DiscountAction[] = (actionRows ?? []).map((a) => {

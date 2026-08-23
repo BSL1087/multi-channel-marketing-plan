@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -33,8 +33,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ActionFormDialog } from "@/components/action-form-dialog";
+import {
+  CHANNEL_TYPE_STYLES,
+  groupChannelsByType,
+  type ChannelType,
+} from "@/lib/channel-validation";
 
-type Option = { id: string; name: string };
+type Option = { id: string; name: string; type: ChannelType };
 type BrandOption = {
   id: string;
   name: string;
@@ -127,25 +132,35 @@ export function MonthView({
   // Group segments by channel, then lay each channel into stacked lanes.
   // Finished actions with more brands than the base row holds are truncated
   // behind a toggle; running and planned ones always show every brand.
-  const byChannel = useMemo(() => {
+  // Channels grouped by category (Marketplaces → eigene Webshops → Händler)
+  // and sorted alphabetically inside a category, independent of the name.
+  const channelGroups = useMemo(
+    () => groupChannelsByType(channels),
+    [channels],
+  );
+
+  const rowGroups = useMemo(() => {
     const map = new Map<string, ActionSegment[]>();
     for (const s of segments) {
       const list = map.get(s.action.marketplace_id) ?? [];
       list.push(s);
       map.set(s.action.marketplace_id, list);
     }
-    return channels.map((c) => ({
-      channel: c,
-      layout: layoutMonthChannelCollapsible(map.get(c.id) ?? [], year, month, {
-        cutoff: todayIso,
-        expanded: expandedChannels.has(c.id),
-        baseLanes: BASE_LANES,
-        getGroup: (s) => s.brand.id,
-        getActionId: (s) => s.action.id,
-        getSortKey: (s) => s.brand.name,
-      }),
+    return channelGroups.map((group) => ({
+      ...group,
+      rows: group.items.map((c) => ({
+        channel: c,
+        layout: layoutMonthChannelCollapsible(map.get(c.id) ?? [], year, month, {
+          cutoff: todayIso,
+          expanded: expandedChannels.has(c.id),
+          baseLanes: BASE_LANES,
+          getGroup: (s) => s.brand.id,
+          getActionId: (s) => s.action.id,
+          getSortKey: (s) => s.brand.name,
+        }),
+      })),
     }));
-  }, [segments, channels, year, month, todayIso, expandedChannels]);
+  }, [segments, channelGroups, year, month, todayIso, expandedChannels]);
 
   // Colour legend: brands present this month, grouped by product group.
   const legend = useMemo(() => {
@@ -284,131 +299,145 @@ export function MonthView({
             </div>
           </div>
 
-          {/* Channel rows */}
-          {byChannel.map(({ channel, layout }) => {
-            const rowH = rowHeight(layout.lanes);
-            const expanded = expandedChannels.has(channel.id);
-            return (
-              <div key={channel.id} className="flex border-b last:border-b-0">
-                <div
-                  className="flex shrink-0 items-center border-r px-3 text-sm font-medium"
-                  style={{ width: LABEL_WIDTH }}
-                >
-                  {channel.name}
-                </div>
-                <div className="relative flex-1" style={{ height: rowH }}>
-                  {/* Day gridlines + weekend/today shading */}
-                  {days.map((d) => (
-                    <div
-                      key={d.day}
-                      className={`absolute top-0 h-full border-l border-border/50 ${
-                        d.isWeekend ? "bg-muted/40" : ""
-                      } ${d.isToday ? "bg-primary/5" : ""}`}
-                      style={{ left: pct(d.leftPx), width: pct(DAY_WIDTH) }}
-                    />
-                  ))}
-
-                  {/* Labelled action bars (stacked on overlap) */}
-                  {layout.items.map(
-                    ({ item, leftPx, widthPx, lane, clippedStart, clippedEnd }) => {
-                      const light = isLightColor(item.brand.color);
-                      const showDiscount = widthPx >= 4 * DAY_WIDTH;
-                      return (
-                        <TooltipProvider key={item.id} delayDuration={150}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => openEdit(item.action)}
-                                aria-label={`${item.action.title} (${item.brand.name})`}
-                                className={`absolute flex items-center gap-1 overflow-hidden px-1.5 text-left ring-1 ring-black/10 transition-[filter] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                  clippedStart ? "rounded-l-none" : "rounded-l-[3px]"
-                                } ${
-                                  clippedEnd ? "rounded-r-none" : "rounded-r-[3px]"
-                                }`}
-                                style={{
-                                  left: pct(leftPx),
-                                  width: pct(widthPx),
-                                  top: ROW_PAD + lane * LANE_SLOT,
-                                  height: BAR_HEIGHT,
-                                  backgroundColor: item.brand.color,
-                                  color: light ? "#111827" : "#ffffff",
-                                }}
-                              >
-                                {clippedStart && (
-                                  <ChevronLeft className="h-3 w-3 shrink-0 opacity-80" />
-                                )}
-                                <span className="truncate text-[11px] font-medium leading-none">
-                                  {item.action.title}
-                                  {showDiscount && (
-                                    <span className="font-normal opacity-90">
-                                      {" · "}
-                                      {item.action.discount_value}
-                                    </span>
-                                  )}
-                                </span>
-                                {clippedEnd && (
-                                  <ChevronRight className="ml-auto h-3 w-3 shrink-0 opacity-80" />
-                                )}
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p className="font-semibold">{item.action.title}</p>
-                              <p className="text-xs">
-                                {item.action.brands.map((b) => b.name).join(", ")}{" "}
-                                · {item.action.marketplace_name}
-                              </p>
-                              <p className="text-xs">
-                                {formatDate(item.start_date)} –{" "}
-                                {formatDate(item.end_date)}
-                              </p>
-                              <p className="text-xs">
-                                Rabatt: {item.action.discount_value}
-                              </p>
-                              {item.action.comment && (
-                                <p className="mt-1 text-xs italic text-muted-foreground">
-                                  {item.action.comment}
-                                </p>
-                              )}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      );
-                    },
-                  )}
-
-                  {/* Truncated past actions: the toggle takes the lane the
-                      hidden brands would have used. */}
-                  {layout.chips.map((chip) => (
-                    <button
-                      key={chip.actionId}
-                      type="button"
-                      onClick={() => toggleChannel(channel.id)}
-                      aria-expanded={expanded}
-                      title={
-                        expanded
-                          ? `Alle Marken in ${channel.name} wieder einklappen`
-                          : `Alle Marken in ${channel.name} anzeigen`
-                      }
-                      className="absolute inline-flex items-center gap-1 whitespace-nowrap rounded-sm px-1.5 text-[11px] font-medium leading-none text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      style={{
-                        left: pct(chip.leftPx),
-                        top: ROW_PAD + chip.lane * LANE_SLOT,
-                        height: BAR_HEIGHT,
-                      }}
-                    >
-                      {expanded ? (
-                        <ChevronUp className="h-3 w-3 shrink-0" aria-hidden />
-                      ) : (
-                        <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
-                      )}
-                      {expanded ? "weniger anzeigen" : "mehr anzeigen"}
-                    </button>
-                  ))}
-                </div>
+          {/* Channel rows, grouped by category (Marketplaces → Webshops → Händler) */}
+          {rowGroups.map((group) => (
+            <Fragment key={group.type}>
+              {/* Category header — same tint as the label cells beneath it */}
+              <div
+                className={`flex items-center gap-2 border-b px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${CHANNEL_TYPE_STYLES[group.type].header}`}
+              >
+                {group.label}
+                <span className="font-normal opacity-70">
+                  ({group.items.length})
+                </span>
               </div>
-            );
-          })}
+
+              {group.rows.map(({ channel, layout }) => {
+                const rowH = rowHeight(layout.lanes);
+                const expanded = expandedChannels.has(channel.id);
+                return (
+                <div key={channel.id} className="flex border-b last:border-b-0">
+                  <div
+                    className={`flex shrink-0 items-center border-r px-3 text-sm font-medium ${CHANNEL_TYPE_STYLES[group.type].label}`}
+                    style={{ width: LABEL_WIDTH }}
+                  >
+                    {channel.name}
+                  </div>
+                  <div className="relative flex-1" style={{ height: rowH }}>
+                    {/* Day gridlines + weekend/today shading */}
+                    {days.map((d) => (
+                      <div
+                        key={d.day}
+                        className={`absolute top-0 h-full border-l border-border/50 ${
+                          d.isWeekend ? "bg-muted/40" : ""
+                        } ${d.isToday ? "bg-primary/5" : ""}`}
+                        style={{ left: pct(d.leftPx), width: pct(DAY_WIDTH) }}
+                      />
+                    ))}
+
+                    {/* Labelled action bars (stacked on overlap) */}
+                    {layout.items.map(
+                      ({ item, leftPx, widthPx, lane, clippedStart, clippedEnd }) => {
+                        const light = isLightColor(item.brand.color);
+                        const showDiscount = widthPx >= 4 * DAY_WIDTH;
+                        return (
+                          <TooltipProvider key={item.id} delayDuration={150}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(item.action)}
+                                  aria-label={`${item.action.title} (${item.brand.name})`}
+                                  className={`absolute flex items-center gap-1 overflow-hidden px-1.5 text-left ring-1 ring-black/10 transition-[filter] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                    clippedStart ? "rounded-l-none" : "rounded-l-[3px]"
+                                  } ${
+                                    clippedEnd ? "rounded-r-none" : "rounded-r-[3px]"
+                                  }`}
+                                  style={{
+                                    left: pct(leftPx),
+                                    width: pct(widthPx),
+                                    top: ROW_PAD + lane * LANE_SLOT,
+                                    height: BAR_HEIGHT,
+                                    backgroundColor: item.brand.color,
+                                    color: light ? "#111827" : "#ffffff",
+                                  }}
+                                >
+                                  {clippedStart && (
+                                    <ChevronLeft className="h-3 w-3 shrink-0 opacity-80" />
+                                  )}
+                                  <span className="truncate text-[11px] font-medium leading-none">
+                                    {item.action.title}
+                                    {showDiscount && (
+                                      <span className="font-normal opacity-90">
+                                        {" · "}
+                                        {item.action.discount_value}
+                                      </span>
+                                    )}
+                                  </span>
+                                  {clippedEnd && (
+                                    <ChevronRight className="ml-auto h-3 w-3 shrink-0 opacity-80" />
+                                  )}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="font-semibold">{item.action.title}</p>
+                                <p className="text-xs">
+                                  {item.action.brands.map((b) => b.name).join(", ")}{" "}
+                                  · {item.action.marketplace_name}
+                                </p>
+                                <p className="text-xs">
+                                  {formatDate(item.start_date)} –{" "}
+                                  {formatDate(item.end_date)}
+                                </p>
+                                <p className="text-xs">
+                                  Rabatt: {item.action.discount_value}
+                                </p>
+                                {item.action.comment && (
+                                  <p className="mt-1 text-xs italic text-muted-foreground">
+                                    {item.action.comment}
+                                  </p>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      },
+                    )}
+
+                    {/* Truncated past actions: the toggle takes the lane the
+                        hidden brands would have used. */}
+                    {layout.chips.map((chip) => (
+                      <button
+                        key={chip.actionId}
+                        type="button"
+                        onClick={() => toggleChannel(channel.id)}
+                        aria-expanded={expanded}
+                        title={
+                          expanded
+                            ? `Alle Marken in ${channel.name} wieder einklappen`
+                            : `Alle Marken in ${channel.name} anzeigen`
+                        }
+                        className="absolute inline-flex items-center gap-1 whitespace-nowrap rounded-sm px-1.5 text-[11px] font-medium leading-none text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        style={{
+                          left: pct(chip.leftPx),
+                          top: ROW_PAD + chip.lane * LANE_SLOT,
+                          height: BAR_HEIGHT,
+                        }}
+                      >
+                        {expanded ? (
+                          <ChevronUp className="h-3 w-3 shrink-0" aria-hidden />
+                        ) : (
+                          <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
+                        )}
+                        {expanded ? "weniger anzeigen" : "mehr anzeigen"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                );
+              })}
+            </Fragment>
+          ))}
         </div>
       </div>
 

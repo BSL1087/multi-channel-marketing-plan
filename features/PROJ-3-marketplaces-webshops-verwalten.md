@@ -303,3 +303,49 @@ _To be added by /deploy_
 
 ## Deployment
 _To be added by /deploy_
+
+## Erweiterung: Kanal-Kategorien (2026-08-21)
+
+Nachträgliche Erweiterung des ursprünglich zurückgestellten Plattform-Typs
+(siehe Decision Log, 2026-06-24). Der Typ existiert seit `add_type_to_marketplaces`
+(2026-07-02) mit zwei Werten und wurde am 2026-08-21 um eine dritte Kategorie
+ergänzt.
+
+### Was sich geändert hat
+- **Dritte Kategorie „Händler"** (`retailer`) neben `marketplace` und `webshop`.
+  Migration `add_retailer_to_marketplace_types` erweitert den Check-Constraint
+  `marketplaces_type_check` auf `('marketplace', 'webshop', 'retailer')`.
+- **Sortierung nach Kategorie statt nach Name:** Kanäle werden überall (Jahres-
+  kalender, Monats-Zoom, Kanal-Verwaltung, Kanal-Dropdown im Aktions-Dialog) erst
+  nach Kategorie gruppiert — Marketplaces → eigene Webshops → Händler — und
+  **innerhalb** der Kategorie alphabetisch (deutsches Collating, case-insensitiv).
+  Namens-Präfixe wie „WS-" sind damit nicht mehr nötig, um eine Kategorie
+  zusammenzuhalten.
+- **Farbliche Kennzeichnung je Kategorie:** Marketplaces blau, eigene Webshops
+  grün, Händler orange. Sichtbar als Gruppen-Kopfzeile im Kalender, als Tönung
+  der Kanal-Spalte, als Badge in der Kanal-Verwaltung und als Farbpunkt im Filter.
+  Ein einziger Kalender bleibt erhalten — die Kategorien sind Abschnitte darin,
+  keine getrennten Ansichten.
+- **Filter im Jahreskalender:** drei Checkboxen (eine je Kategorie) statt zwei;
+  alle standardmäßig aktiv.
+
+### Zentrale Stellen
+- `src/lib/channel-validation.ts`: `CHANNEL_TYPES` (Array-Reihenfolge = Anzeige-
+  reihenfolge), `CHANNEL_TYPE_LABELS(_PLURAL)`, `CHANNEL_TYPE_STYLES` (Tailwind-
+  Klassen je Kategorie), `compareChannels` / `sortChannels` / `groupChannelsByType`
+  / `countChannelsByType`. Eine neue Kategorie erfordert künftig nur: DB-Constraint
+  erweitern + Eintrag in `CHANNEL_TYPES`, Labels und Styles.
+- `src/components/calendar-view.tsx`, `src/components/month-view.tsx`,
+  `src/components/channel-manager.tsx`, `src/components/action-form-dialog.tsx`
+  konsumieren ausschließlich diese Helfer.
+
+### Tests
+- `src/lib/channel-validation.test.ts` — 20/20 grün, davon neu: Kategorie-Enum
+  (3 Werte), Sortierung (Kategorie vor Name, Präfix irrelevant, Umlaute/Case,
+  keine Mutation), Gruppierung (Reihenfolge, leere Kategorien entfallen) und
+  Zählung.
+- `src/components/calendar-view.test.tsx` / `src/components/month-view.test.tsx` —
+  erste Komponenten-Tests im Projekt: prüfen die **gerenderte** Reihenfolge in
+  einem einzigen Kalender (Kategorie-Kopfzeile + Kanäle darunter), die Farb-
+  klassen je Kategorie und die drei Filter-Checkboxen samt Zählern.
+- `npm test` (85/85), `tsc --noEmit` und `next build` grün.

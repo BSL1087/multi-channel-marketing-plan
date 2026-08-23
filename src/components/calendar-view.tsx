@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -32,7 +32,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ActionFormDialog } from "@/components/action-form-dialog";
-import type { ChannelType } from "@/lib/channel-validation";
+import {
+  CHANNEL_TYPES,
+  CHANNEL_TYPE_LABELS_PLURAL,
+  CHANNEL_TYPE_STYLES,
+  countChannelsByType,
+  groupChannelsByType,
+  type ChannelType,
+} from "@/lib/channel-validation";
 
 type Option = { id: string; name: string; type: ChannelType };
 type BrandOption = {
@@ -102,9 +109,17 @@ export function CalendarView({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<DiscountAction | null>(null);
 
-  // Channel-type filter (PROJ-3 extension): show own webshops and/or marketplaces.
+  // Channel-type filter (PROJ-3 extension): marketplaces, own webshops and
+  // retailers. Every category is visible by default.
   const [visibleTypes, setVisibleTypes] = useState<Record<ChannelType, boolean>>(
-    { webshop: true, marketplace: true },
+    () =>
+      CHANNEL_TYPES.reduce(
+        (acc, type) => {
+          acc[type] = true;
+          return acc;
+        },
+        {} as Record<ChannelType, boolean>,
+      ),
   );
 
   const months = useMemo(() => monthColumns(), []);
@@ -127,10 +142,16 @@ export function CalendarView({
   // One bar per (action × brand). Multi-brand actions become several segments.
   const segments = useMemo(() => toSegments(actions), [actions]);
 
-  // Rows to render = channels whose type is currently enabled in the filter.
-  const visibleChannels = useMemo(
-    () => channels.filter((c) => visibleTypes[c.type]),
+  // Rows to render = channels whose type is currently enabled in the filter,
+  // grouped by category (Marketplaces → eigene Webshops → Händler) and sorted
+  // alphabetically inside a category, independent of the channel name.
+  const visibleGroups = useMemo(
+    () => groupChannelsByType(channels.filter((c) => visibleTypes[c.type])),
     [channels, visibleTypes],
+  );
+  const visibleChannels = useMemo(
+    () => visibleGroups.flatMap((g) => g.items),
+    [visibleGroups],
   );
 
   // Segments that fall in a currently visible channel — drives the legend.
@@ -139,15 +160,7 @@ export function CalendarView({
     return segments.filter((s) => visibleIds.has(s.action.marketplace_id));
   }, [segments, visibleChannels]);
 
-  const counts = useMemo(() => {
-    let webshop = 0;
-    let marketplace = 0;
-    for (const c of channels) {
-      if (c.type === "webshop") webshop++;
-      else marketplace++;
-    }
-    return { webshop, marketplace };
-  }, [channels]);
+  const counts = useMemo(() => countChannelsByType(channels), [channels]);
 
   // Colour legend: brands that appear in the visible rows, grouped by product group.
   const legend = useMemo(() => {
@@ -183,25 +196,28 @@ export function CalendarView({
   // lanes (keyed by brand, so one brand's non-overlapping bars line up).
   // Finished actions with many brands are truncated behind a toggle; running
   // and planned ones always show every brand.
-  const byChannel = useMemo(() => {
+  const rowGroups = useMemo(() => {
     const map = new Map<string, ActionSegment[]>();
     for (const s of segments) {
       const list = map.get(s.action.marketplace_id) ?? [];
       list.push(s);
       map.set(s.action.marketplace_id, list);
     }
-    return visibleChannels.map((c) => ({
-      channel: c,
-      row: layoutChannelCollapsible(map.get(c.id) ?? [], year, {
-        cutoff: todayIso,
-        expanded: expandedChannels.has(c.id),
-        baseLanes: BASE_LANES,
-        getGroup: (s) => s.brand.id,
-        getActionId: (s) => s.action.id,
-        getSortKey: (s) => s.brand.name,
-      }),
+    return visibleGroups.map((group) => ({
+      ...group,
+      rows: group.items.map((c) => ({
+        channel: c,
+        row: layoutChannelCollapsible(map.get(c.id) ?? [], year, {
+          cutoff: todayIso,
+          expanded: expandedChannels.has(c.id),
+          baseLanes: BASE_LANES,
+          getGroup: (s) => s.brand.id,
+          getActionId: (s) => s.action.id,
+          getSortKey: (s) => s.brand.name,
+        }),
+      })),
     }));
-  }, [segments, visibleChannels, year, todayIso, expandedChannels]);
+  }, [segments, visibleGroups, year, todayIso, expandedChannels]);
 
   function openCreate() {
     setEditing(null);
@@ -261,37 +277,33 @@ export function CalendarView({
         </Button>
       </div>
 
-      {/* Channel-type filter: toggle own webshops vs. external marketplaces. */}
+      {/* Channel-type filter: one toggle per category, colour-coded like the rows. */}
       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
         <span className="text-sm font-medium text-muted-foreground">
           Anzeigen:
         </span>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="filter-webshop"
-            checked={visibleTypes.webshop}
-            onCheckedChange={(v) =>
-              setVisibleTypes((prev) => ({ ...prev, webshop: v === true }))
-            }
-          />
-          <Label htmlFor="filter-webshop" className="font-normal">
-            Eigene Webshops{" "}
-            <span className="text-muted-foreground">({counts.webshop})</span>
-          </Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="filter-marketplace"
-            checked={visibleTypes.marketplace}
-            onCheckedChange={(v) =>
-              setVisibleTypes((prev) => ({ ...prev, marketplace: v === true }))
-            }
-          />
-          <Label htmlFor="filter-marketplace" className="font-normal">
-            Marketplaces{" "}
-            <span className="text-muted-foreground">({counts.marketplace})</span>
-          </Label>
-        </div>
+        {CHANNEL_TYPES.map((type) => (
+          <div key={type} className="flex items-center gap-2">
+            <Checkbox
+              id={`filter-${type}`}
+              checked={visibleTypes[type]}
+              onCheckedChange={(v) =>
+                setVisibleTypes((prev) => ({ ...prev, [type]: v === true }))
+              }
+            />
+            <Label
+              htmlFor={`filter-${type}`}
+              className="flex items-center gap-1.5 font-normal"
+            >
+              <span
+                className={`h-3 w-3 shrink-0 rounded-[2px] ${CHANNEL_TYPE_STYLES[type].swatch}`}
+                aria-hidden
+              />
+              {CHANNEL_TYPE_LABELS_PLURAL[type]}{" "}
+              <span className="text-muted-foreground">({counts[type]})</span>
+            </Label>
+          </div>
+        ))}
       </div>
 
       {visibleChannels.length === 0 ? (
@@ -335,118 +347,132 @@ export function CalendarView({
             </div>
           </div>
 
-          {/* Channel rows */}
-          {byChannel.map(({ channel, row }) => {
-            const rowH = rowHeight(row.lanes);
-            const slot = rowH / row.lanes;
-            const expanded = expandedChannels.has(channel.id);
-            return (
-            <div key={channel.id} className="flex border-b last:border-b-0">
+          {/* Channel rows, grouped by category (Marketplaces → Webshops → Händler) */}
+          {rowGroups.map((group) => (
+            <Fragment key={group.type}>
+              {/* Category header — same tint as the label cells beneath it */}
               <div
-                className="flex shrink-0 items-center border-r px-3 text-sm font-medium"
-                style={{ width: LABEL_WIDTH }}
+                className={`flex items-center gap-2 border-b px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${CHANNEL_TYPE_STYLES[group.type].header}`}
               >
-                {channel.name}
+                {group.label}
+                <span className="font-normal opacity-70">
+                  ({group.items.length})
+                </span>
               </div>
-              <div className="relative flex-1" style={{ height: rowH }}>
-                {/* Month gridlines */}
-                {months.map((m) => (
-                  <div
-                    key={m.label}
-                    className="absolute top-0 h-full border-l border-border/60"
-                    style={{ left: pct(m.leftPx) }}
-                  />
-                ))}
 
-                {/* Day-accurate action bars (stacked on overlap) */}
-                {row.items.map(({ item, leftPx, widthPx, lane }) => (
-                  <TooltipProvider key={item.id} delayDuration={150}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(item.action)}
-                          aria-label={`${item.action.title} (${item.brand.name})`}
-                          className="absolute rounded-[2px] ring-1 ring-black/10 transition-[filter] hover:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          style={{
-                            left: pct(leftPx),
-                            width: pct(widthPx),
-                            minWidth: 2,
-                            top: lane * slot + (slot - BAR_HEIGHT) / 2,
-                            height: BAR_HEIGHT,
-                            backgroundColor: item.brand.color,
-                          }}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="font-semibold">{item.action.title}</p>
-                        <p className="text-xs">
-                          {item.action.brands.map((b) => b.name).join(", ")} ·{" "}
-                          {item.action.marketplace_name}
-                        </p>
-                        <p className="text-xs">
-                          {formatDate(item.start_date)} –{" "}
-                          {formatDate(item.end_date)}
-                        </p>
-                        <p className="text-xs">
-                          Rabatt: {item.action.discount_value}
-                        </p>
-                        {item.action.comment && (
-                          <p className="mt-1 text-xs italic text-muted-foreground">
-                            {item.action.comment}
+              {group.rows.map(({ channel, row }) => {
+                const rowH = rowHeight(row.lanes);
+                const slot = rowH / row.lanes;
+                const expanded = expandedChannels.has(channel.id);
+                return (
+                <div key={channel.id} className="flex border-b last:border-b-0">
+                <div
+                  className={`flex shrink-0 items-center border-r px-3 text-sm font-medium ${CHANNEL_TYPE_STYLES[group.type].label}`}
+                  style={{ width: LABEL_WIDTH }}
+                >
+                  {channel.name}
+                </div>
+                <div className="relative flex-1" style={{ height: rowH }}>
+                  {/* Month gridlines */}
+                  {months.map((m) => (
+                    <div
+                      key={m.label}
+                      className="absolute top-0 h-full border-l border-border/60"
+                      style={{ left: pct(m.leftPx) }}
+                    />
+                  ))}
+
+                  {/* Day-accurate action bars (stacked on overlap) */}
+                  {row.items.map(({ item, leftPx, widthPx, lane }) => (
+                    <TooltipProvider key={item.id} delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(item.action)}
+                            aria-label={`${item.action.title} (${item.brand.name})`}
+                            className="absolute rounded-[2px] ring-1 ring-black/10 transition-[filter] hover:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            style={{
+                              left: pct(leftPx),
+                              width: pct(widthPx),
+                              minWidth: 2,
+                              top: lane * slot + (slot - BAR_HEIGHT) / 2,
+                              height: BAR_HEIGHT,
+                              backgroundColor: item.brand.color,
+                            }}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="font-semibold">{item.action.title}</p>
+                          <p className="text-xs">
+                            {item.action.brands.map((b) => b.name).join(", ")} ·{" "}
+                            {item.action.marketplace_name}
                           </p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ))}
+                          <p className="text-xs">
+                            {formatDate(item.start_date)} –{" "}
+                            {formatDate(item.end_date)}
+                          </p>
+                          <p className="text-xs">
+                            Rabatt: {item.action.discount_value}
+                          </p>
+                          {item.action.comment && (
+                            <p className="mt-1 text-xs italic text-muted-foreground">
+                              {item.action.comment}
+                            </p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ))}
 
-                {/* Truncated past actions: the toggle sits in the next lane,
-                    anchored at the action whose brands it hides. */}
-                {row.chips.map((chip) => (
-                  <button
-                    key={chip.actionId}
-                    type="button"
-                    onClick={() => toggleChannel(channel.id)}
-                    aria-expanded={expanded}
-                    title={
-                      expanded
-                        ? `Alle Marken in ${channel.name} wieder einklappen`
-                        : `Alle Marken in ${channel.name} anzeigen`
-                    }
-                    className="absolute inline-flex items-center gap-0.5 whitespace-nowrap rounded-sm text-[10px] font-medium leading-none text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    style={{
-                      top: chip.lane * slot + (slot - CHIP_HEIGHT) / 2,
-                      height: CHIP_HEIGHT,
-                      ...(chip.leftPx > TRACK_WIDTH - CHIP_RESERVE
-                        ? { right: 4 }
-                        : { left: pct(chip.leftPx) }),
-                    }}
-                  >
-                    {expanded ? (
-                      <ChevronUp className="h-2.5 w-2.5 shrink-0" aria-hidden />
-                    ) : (
-                      <ChevronDown
-                        className="h-2.5 w-2.5 shrink-0"
-                        aria-hidden
-                      />
-                    )}
-                    {expanded ? "weniger" : "mehr"}
-                  </button>
-                ))}
+                  {/* Truncated past actions: the toggle sits in the next lane,
+                      anchored at the action whose brands it hides. */}
+                  {row.chips.map((chip) => (
+                    <button
+                      key={chip.actionId}
+                      type="button"
+                      onClick={() => toggleChannel(channel.id)}
+                      aria-expanded={expanded}
+                      title={
+                        expanded
+                          ? `Alle Marken in ${channel.name} wieder einklappen`
+                          : `Alle Marken in ${channel.name} anzeigen`
+                      }
+                      className="absolute inline-flex items-center gap-0.5 whitespace-nowrap rounded-sm text-[10px] font-medium leading-none text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      style={{
+                        top: chip.lane * slot + (slot - CHIP_HEIGHT) / 2,
+                        height: CHIP_HEIGHT,
+                        ...(chip.leftPx > TRACK_WIDTH - CHIP_RESERVE
+                          ? { right: 4 }
+                          : { left: pct(chip.leftPx) }),
+                      }}
+                    >
+                      {expanded ? (
+                        <ChevronUp className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                      ) : (
+                        <ChevronDown
+                          className="h-2.5 w-2.5 shrink-0"
+                          aria-hidden
+                        />
+                      )}
+                      {expanded ? "weniger" : "mehr"}
+                    </button>
+                  ))}
 
-                {/* "Today" marker: dashed line, below the month axis, click-through */}
-                {todayLeft !== null && (
-                  <div
-                    className="pointer-events-none absolute top-0 z-10 h-full w-0 border-l border-dashed border-primary/70"
-                    style={{ left: todayLeft }}
-                    aria-hidden
-                  />
-                )}
-              </div>
-            </div>
-            );
-          })}
+                  {/* "Today" marker: dashed line, below the month axis, click-through */}
+                  {todayLeft !== null && (
+                    <div
+                      className="pointer-events-none absolute top-0 z-10 h-full w-0 border-l border-dashed border-primary/70"
+                      style={{ left: todayLeft }}
+                      aria-hidden
+                    />
+                  )}
+                </div>
+                </div>
+                );
+              })}
+            </Fragment>
+          ))}
         </div>
       </div>
       )}

@@ -6,6 +6,7 @@ import { CalendarPlus, Pencil, Plus, Trash2 } from "lucide-react";
 
 import type { DiscountAction } from "@/app/tools/multi-channel-marketing/aktionen/actions";
 import { cn } from "@/lib/utils";
+import type { ChannelType } from "@/lib/channel-validation";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,7 +19,7 @@ import {
 import { ActionFormDialog } from "@/components/action-form-dialog";
 import { DeleteActionDialog } from "@/components/delete-action-dialog";
 
-type Option = { id: string; name: string };
+type Option = { id: string; name: string; type: ChannelType };
 type BrandOption = { id: string; name: string; product_group_name: string };
 
 function formatDate(iso: string): string {

@@ -4,7 +4,8 @@ import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Multi-Channel-Marketing",
-  description: "Marketing-Aktionskalender für Marketplaces, Webshops und Marken",
+  description:
+    "Marketing-Aktionskalender für Marketplaces, Webshops, Händler und Marken",
 };
 
 export default function RootLayout({

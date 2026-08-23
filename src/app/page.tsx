@@ -90,7 +90,8 @@ export default async function DashboardPage() {
                 <div>
                   <h2 className="font-medium">Kanäle verwalten</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Marketplaces &amp; Webshops für die Aktionsplanung pflegen.
+                    Marketplaces, Webshops &amp; Händler für die Aktionsplanung
+                    pflegen.
                   </p>
                 </div>
                 <span className="mt-auto inline-flex items-center text-sm font-medium text-primary">

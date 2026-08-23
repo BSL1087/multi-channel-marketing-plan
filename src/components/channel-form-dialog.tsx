@@ -104,7 +104,7 @@ export function ChannelFormDialog({
           <DialogDescription>
             {isEdit
               ? "Ändere Name und Typ dieses Vertriebskanals."
-              : "Lege einen Marketplace oder eigenen Webshop an (z.B. Amazon, Otto, eigener Shop)."}
+              : "Lege einen Marketplace, eigenen Webshop oder Händler an (z.B. Amazon, eigener Shop, Sport Müller)."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
