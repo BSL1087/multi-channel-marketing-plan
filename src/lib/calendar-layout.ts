@@ -179,31 +179,31 @@ export function addDays(iso: string, days: number): string {
 }
 
 /**
- * Channel layout that truncates finished actions so a busy row keeps its
- * default height.
+ * Channel layout that truncates actions that are not running so a busy row
+ * keeps its default height.
  *
  * The unit is the BRAND, not the action: one action with many brands is what
- * makes a row tall, so a past action with more than `baseLanes` brands shows
- * only `baseLanes - 1` of them plus a toggle in the next lane. An action with
- * few brands stays complete — it already fits. Running and planned actions are
- * never truncated, however many brands they carry.
+ * makes a row tall, so such an action shows only `baseLanes - 1` brands plus a
+ * toggle in the next lane. An action with few brands stays complete — it
+ * already fits. Only an action that covers today is never truncated, however
+ * many brands it carries: while it runs, it is the row you are watching.
  *
  * `expanded` (row level) puts every brand back and turns the toggles into
- * "collapse again" controls. `cutoff` is today's ISO date; null disables
+ * "collapse again" controls. `today` is today's ISO date; null disables
  * truncation entirely.
  */
 export function layoutChannelCollapsible<T extends CalendarItem>(
   items: T[],
   year: number,
   {
-    cutoff,
+    today,
     expanded = false,
     baseLanes = 3,
     getGroup,
     getActionId,
     getSortKey,
   }: {
-    cutoff: string | null;
+    today: string | null;
     expanded?: boolean;
     baseLanes?: number;
     getGroup: (item: T) => string;
@@ -230,8 +230,14 @@ export function layoutChannelCollapsible<T extends CalendarItem>(
 
   for (const [actionId, segs] of byAction) {
     // All bars of an action share its date range, so one segment decides.
-    const isPast = cutoff !== null && segs[0].end_date < cutoff;
-    const truncatable = isPast && segs.length > baseLanes;
+    // Only an action that is running RIGHT NOW stays complete — that is the
+    // row you are actually watching. Everything else (finished or still
+    // planned) is truncated, so a busy year keeps flat, readable rows.
+    const running =
+      today !== null &&
+      segs[0].start_date <= today &&
+      segs[0].end_date >= today;
+    const truncatable = today !== null && !running && segs.length > baseLanes;
 
     const shown =
       truncatable && !expanded

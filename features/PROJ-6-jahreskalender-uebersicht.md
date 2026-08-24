@@ -85,6 +85,7 @@
 | Entwürfe erscheinen im Kalender — schraffiert in Markenfarbe, Checkbox zum Ausblenden (Standard an) | Die Jahresansicht dient der Planung; ein unsichtbarer Entwurf belegt den Slot trotzdem. Revidiert die PROJ-13-Entscheidung vom 2026-08-23 | 2026-08-24 |
 | Schraffur statt Graustufe | Grau hätte die Markenerkennung zerstört — Farbe sagt „welche Marke", Textur sagt „wie verbindlich" | 2026-08-24 |
 | Klick auf einen Entwurf bietet „In Kalender übernehmen" | Freigabe dort, wo die Planungsentscheidung fällt; der Statuswechsel bleibt bestätigungspflichtig | 2026-08-24 |
+| Gekürzt wird alles, was heute nicht läuft (vorher: nur Vergangenes) | Eine geplante Aktion mit vielen Marken bläht die Zeile genauso auf wie eine vergangene; interessant im Detail ist sie erst, wenn sie läuft. Ersetzt die Regel vom 2026-08-21 | 2026-08-24 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
@@ -293,6 +294,48 @@ Die Einheit ist die **Marke**, nicht der Aktionszeitraum — eine Aktion mit vie
 
 **Verifikation:** `tsc --noEmit` ✓, `next build` ✓, `npm test` (66 Tests, davon 8 in `src/lib/calendar-layout.test.ts`) ✓.
 
+
+## Kürzen gilt jetzt auch für geplante Aktionen (2026-08-24)
+
+**Änderung der Regel vom 2026-08-21.** Bisher wurden nur **vergangene** Aktionen
+gekürzt; laufende und geplante zeigten immer jede Marke. Mit den nun sichtbaren
+Entwürfen fiel auf, dass eine geplante Aktion mit vielen Marken die Zeile genauso
+aufbläht wie eine vergangene — der Amazon-Entwurf „Prime Days Oktober" (5 Marken)
+machte die Amazon-Zeile im Oktober fünf Spuren hoch, Monate bevor sie jemanden
+im Detail interessiert.
+
+**Neue Regel (Nutzer-Entscheidung 2026-08-24):** Gekürzt wird alles, was
+**heute nicht läuft** — vergangen wie geplant. Ausschließlich eine Aktion, deren
+Zeitraum das heutige Datum enthält, bleibt immer vollständig aufgeklappt: das
+ist die Zeile, die man gerade tatsächlich beobachtet.
+
+- Unverändert bleibt die Einheit: die **Marke**. Eine Aktion mit bis zu
+  `baseLanes` Marken (Jahresansicht 3, Monatsansicht 2) passt ohnehin in die
+  Standardhöhe und wird nie gekürzt, egal in welcher Phase.
+- Unverändert bleibt die Bedienung: ein Klick auf „mehr" klappt die **ganze
+  Kanal-Zeile** auf, „weniger" wieder zu.
+- Unverändert bleibt, dass Entwürfe dabei nicht gesondert behandelt werden — für
+  die Zeilenhöhe zählt der Zeitraum, nicht der Status.
+
+**Technisch:** Die Option `cutoff` in `layoutChannelCollapsible` und
+`layoutMonthChannelCollapsible` heißt jetzt `today` — sie ist keine Grenze mehr,
+sondern der Bezugstag. Aus `end_date < cutoff` (vergangen) wurde
+`!(start_date <= today && end_date >= today)` (läuft nicht). `today: null`
+deaktiviert das Kürzen weiterhin komplett.
+
+**Wirkung auf die Echtdaten (Stand 2026-08-24):** Neu gekürzt wird der
+Amazon-Entwurf „Prime Days Oktober" (5 Marken → 2 Marken + „mehr"), die
+Amazon-Zeile fällt im Oktober von 5 auf 3 Spuren. Kaufland (Sparfuchswoche, 6
+Marken) und Family's World (Summer-Sale, 5 Marken, seit 23.08. beendet) waren
+schon vorher gekürzt. Aktuell läuft keine Aktion mit mehr als 3 Marken, die
+Ausnahme „läuft gerade" greift also im Moment für keine Zeile — sie ist die
+Zusicherung für den Fall, dass eine große Aktion startet.
+
+**Tests:** `calendar-layout.test.ts` und `month-layout.test.ts` prüfen jetzt
+zusätzlich: geplante Aktion wird gekürzt, geplante Aktion mit wenigen Marken
+bleibt vollständig, aufklappen holt auch geplante Marken zurück, und in einer
+Zeile mit vergangener + laufender + geplanter Aktion bleibt genau die laufende
+unangetastet.
 
 ## Kategorie-Gruppierung im Kalender (2026-08-21)
 

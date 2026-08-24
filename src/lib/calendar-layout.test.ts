@@ -28,7 +28,7 @@ function action(
 }
 
 const opts = {
-  cutoff: "2026-08-21",
+  today: "2026-08-21",
   getGroup: (s: Seg) => s.brand,
   getActionId: (s: Seg) => s.action,
   getSortKey: (s: Seg) => s.brand,
@@ -61,8 +61,8 @@ describe("layoutChannelCollapsible", () => {
     expect(row.lanes).toBe(3); // standard height
   });
 
-  it("never truncates a running or planned action, however many brands", () => {
-    // Ends after the cutoff, so it is still running.
+  it("never truncates the action running today, however many brands", () => {
+    // Starts before and ends after today, so it is the one currently running.
     const items = action("summer-sale", "2026-07-09", "2026-08-23", [
       ...SIX,
       "Tega",
@@ -113,11 +113,11 @@ describe("layoutChannelCollapsible", () => {
     expect(row.lanes).toBe(7); // 6 brands + the "weniger anzeigen" lane
   });
 
-  it("truncates nothing without a cutoff", () => {
+  it("truncates nothing without a reference date", () => {
     const items = action("sparfuchs", "2026-06-04", "2026-06-10", SIX);
     const row = layoutChannelCollapsible(items, 2026, {
       ...opts,
-      cutoff: null,
+      today: null,
     });
 
     expect(row.chips).toEqual([]);
@@ -134,6 +134,58 @@ describe("layoutChannelCollapsible", () => {
 
     const juneBar = row.items.find((i) => i.item.action === "sparfuchs");
     expect(row.chips[0].leftPx).toBe(juneBar?.leftPx);
+  });
+
+  it("truncates a planned action too — only what runs today stays open", () => {
+    // October, months away from today: it occupies the slot but nobody is
+    // watching it right now, so it must not inflate the row.
+    const items = action("prime-days", "2026-10-01", "2026-10-31", SIX);
+    const row = layoutChannelCollapsible(items, 2026, opts);
+
+    expect(row.items.map((i) => i.item.brand)).toEqual(["Dooky", "Fit Kidz"]);
+    expect(row.chips).toHaveLength(1);
+    expect(row.chips[0].actionId).toBe("prime-days");
+    expect(row.lanes).toBe(3); // standard height
+  });
+
+  it("keeps a planned action complete when its brands fit anyway", () => {
+    const items = action("prime-days", "2026-10-01", "2026-10-31", [
+      "Prfrm",
+      "RPM",
+      "Wolverson",
+    ]);
+    const row = layoutChannelCollapsible(items, 2026, opts);
+
+    expect(row.chips).toEqual([]);
+    expect(row.items).toHaveLength(3);
+  });
+
+  it("expands a planned action again when the row is unfolded", () => {
+    const items = action("prime-days", "2026-10-01", "2026-10-31", SIX);
+    const row = layoutChannelCollapsible(items, 2026, {
+      ...opts,
+      expanded: true,
+    });
+
+    expect(row.items).toHaveLength(6);
+    expect(row.chips).toHaveLength(1);
+  });
+
+  it("truncates past and planned actions side by side, running one untouched", () => {
+    const items = [
+      ...action("sparfuchs", "2026-06-04", "2026-06-10", SIX), // past
+      ...action("summer", "2026-08-15", "2026-08-31", [...SIX, "Tega"]), // running
+      ...action("prime-days", "2026-10-01", "2026-10-31", SIX), // planned
+    ];
+    const row = layoutChannelCollapsible(items, 2026, opts);
+
+    expect(row.chips.map((c) => c.actionId).sort()).toEqual([
+      "prime-days",
+      "sparfuchs",
+    ]);
+    expect(
+      row.items.filter((i) => i.item.action === "summer"),
+    ).toHaveLength(7);
   });
 
   it("gives two truncated actions their own toggle", () => {

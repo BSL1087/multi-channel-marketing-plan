@@ -135,8 +135,8 @@ export function MonthView({
   }
 
   // Group segments by channel, then lay each channel into stacked lanes.
-  // Finished actions with more brands than the base row holds are truncated
-  // behind a toggle; running and planned ones always show every brand.
+  // Actions with more brands than the base row holds are truncated behind a
+  // toggle unless they are running today — those always show every brand.
   // Channels grouped by category (Marketplaces → eigene Webshops → Händler)
   // and sorted alphabetically inside a category, independent of the name.
   const channelGroups = useMemo(
@@ -156,7 +156,7 @@ export function MonthView({
       rows: group.items.map((c) => ({
         channel: c,
         layout: layoutMonthChannelCollapsible(map.get(c.id) ?? [], year, month, {
-          cutoff: todayIso,
+          today: todayIso,
           expanded: expandedChannels.has(c.id),
           baseLanes: BASE_LANES,
           getGroup: (s) => s.brand.id,

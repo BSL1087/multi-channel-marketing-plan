@@ -227,6 +227,8 @@ Umgesetzt gemäß Tech Design — reine Frontend-Erweiterung, kein neues Schema,
 
 Die Monatsansicht zeigt Entwürfe künftig genauso wie die Jahresansicht: schraffierter Balken in der Markenfarbe, Tooltip mit Kennzeichen „Entwurf", Klick bietet „In Kalender übernehmen". **Keine** eigene Checkbox zum Ausblenden — die Monatsansicht bleibt ohne Filterzeile. Spezifikation und Begründung: PROJ-6, Abschnitt „Entwürfe in der Jahresansicht". Revidiert die PROJ-13-Entscheidung vom 2026-08-23.
 
+**Kürzen (2026-08-24):** Die Monatsansicht folgt der neuen Regel aus PROJ-6 — gekürzt wird jede Aktion, die heute nicht läuft (vorher: nur vergangene); `baseLanes` bleibt 2.
+
 **Status der Änderung:** umgesetzt am 2026-08-24 (`month-view.tsx`: Schraffur, Tooltip-Kennzeichen, Legenden-Schlüssel; kein eigener Filter). Details in PROJ-6.
 
 ## Deployment

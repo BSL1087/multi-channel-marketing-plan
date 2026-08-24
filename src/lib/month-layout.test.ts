@@ -168,7 +168,7 @@ describe("layoutMonthChannelCollapsible", () => {
     }));
 
   const opts = {
-    cutoff: "2026-06-20",
+    today: "2026-06-20",
     getGroup: (s: Seg) => s.brand,
     getActionId: (s: Seg) => s.action,
     getSortKey: (s: Seg) => s.brand,
@@ -197,7 +197,21 @@ describe("layoutMonthChannelCollapsible", () => {
     expect(row.lanes).toBe(2); // base height
   });
 
-  it("never truncates an action that is still running", () => {
+  it("truncates a planned action as well", () => {
+    // Late June, after today (20.06.) — planned, so it gets folded away too.
+    const items = action("b", "2026-06-25", "2026-06-28", [
+      "Dooky",
+      "Haakaa",
+      "Prfrm",
+    ]);
+    const row = layoutMonthChannelCollapsible(items, 2026, 5, opts);
+
+    expect(row.items.map((i) => i.item.brand)).toEqual(["Dooky"]);
+    expect(row.chips).toHaveLength(1);
+    expect(row.lanes).toBe(2);
+  });
+
+  it("never truncates an action that is running today", () => {
     const items = action("a", "2026-06-04", "2026-06-28", [
       "Dooky",
       "Haakaa",

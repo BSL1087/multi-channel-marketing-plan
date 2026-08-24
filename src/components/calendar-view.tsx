@@ -209,8 +209,8 @@ export function CalendarView({
 
   // Group segments by channel, then lay each visible channel out into stacked
   // lanes (keyed by brand, so one brand's non-overlapping bars line up).
-  // Finished actions with many brands are truncated behind a toggle; running
-  // and planned ones always show every brand.
+  // Actions with many brands are truncated behind a toggle unless they are
+  // running today — those always show every brand.
   const rowGroups = useMemo(() => {
     const map = new Map<string, ActionSegment[]>();
     for (const s of segments) {
@@ -223,7 +223,7 @@ export function CalendarView({
       rows: group.items.map((c) => ({
         channel: c,
         row: layoutChannelCollapsible(map.get(c.id) ?? [], year, {
-          cutoff: todayIso,
+          today: todayIso,
           expanded: expandedChannels.has(c.id),
           baseLanes: BASE_LANES,
           getGroup: (s) => s.brand.id,
