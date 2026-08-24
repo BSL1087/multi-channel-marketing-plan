@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
+import { LoadError } from "@/components/load-error";
 import { Button } from "@/components/ui/button";
 import { CalendarView } from "@/components/calendar-view";
 import { MonthView } from "@/components/month-view";
@@ -79,7 +80,7 @@ export default async function CalendarPage({
   const rangeEnd = monthMode ? `${year}-${mm}-${dd}` : `${year}-12-31`;
 
   const [
-    { data: actionRows },
+    { data: actionRows, error: actionsError },
     { data: channels },
     { data: brandRows },
     { count: draftCount },
@@ -174,7 +175,15 @@ export default async function CalendarPage({
           Tagesansicht, einen Balken zum Bearbeiten.
         </p>
 
-        {monthMode ? (
+        {/* Ein leerer Kalender wegen eines Abfragefehlers sieht aus wie „nichts
+            geplant" — genau die Fehlannahme, vor der dieses Werkzeug schuetzen
+            soll. Deshalb Fehler zeigen statt eines leeren Rasters. */}
+        {actionsError ? (
+          <LoadError
+            detail={actionsError.message}
+            hint="Falls du diese Seite über ein Lesezeichen geöffnet hast: Nutze die offizielle Adresse multi-channel-marketing.vercel.app. Ältere Adressen zeigen einen veralteten Stand."
+          />
+        ) : monthMode ? (
           <MonthView
             year={year}
             month={monthIndex}

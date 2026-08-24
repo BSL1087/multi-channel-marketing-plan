@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { ActionManager } from "@/components/action-manager";
+import { LoadError } from "@/components/load-error";
 import type { ChannelType } from "@/lib/channel-validation";
 import type { DiscountAction } from "./actions";
 
@@ -49,8 +50,11 @@ export default async function ActionsPage() {
     redirect("/login");
   }
 
-  const [{ data: actionRows }, { data: brands }, { data: channels }] =
-    await Promise.all([
+  const [
+    { data: actionRows, error: actionsError },
+    { data: brands },
+    { data: channels },
+  ] = await Promise.all([
       supabase
         .from("discount_actions")
         .select(
@@ -123,11 +127,22 @@ export default async function ActionsPage() {
           Kürze) stellt sie grafisch dar.
         </p>
 
-        <ActionManager
-          actions={actions}
-          brands={brandOptions}
-          channels={channels ?? []}
-        />
+        {/* Eine fehlgeschlagene Abfrage darf NICHT wie „keine Aktionen"
+            aussehen: Wer daraus schliesst, es sei nichts geplant, plant ueber
+            laufende Kampagnen hinweg. Deshalb hier ein deutlicher Fehler
+            statt des Leerzustands. */}
+        {actionsError ? (
+          <LoadError
+            detail={actionsError.message}
+            hint="Falls du diese Seite über ein Lesezeichen geöffnet hast: Nutze die offizielle Adresse multi-channel-marketing.vercel.app. Ältere Adressen zeigen einen veralteten Stand."
+          />
+        ) : (
+          <ActionManager
+            actions={actions}
+            brands={brandOptions}
+            channels={channels ?? []}
+          />
+        )}
       </main>
     </div>
   );
