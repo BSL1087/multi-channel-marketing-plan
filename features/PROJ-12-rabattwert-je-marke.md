@@ -371,3 +371,60 @@ alter table public.discount_actions drop column discount_value;
 ```
 
 Kontrolle danach: alte Spalte weg, Trigger weg, Funktion weg, 32/32 Marken-Zuordnungen mit Rabattwert.
+
+## BUG-13: Bearbeiten schlug an fehlender UPDATE-Policy fehl (2026-08-24)
+
+**Symptom:** Beim Speichern einer bearbeiteten Aktion erschien „Aktion konnte
+nicht gespeichert werden." — gemeldet von Elisabeth am 24.08.2026, 08:29–08:31.
+Anlegen funktionierte weiterhin.
+
+**Ursache:** Mit diesem Feature schreibt `updateAction` die Marken-Zuordnungen
+per `upsert(..., { onConflict: "action_id,brand_id", ignoreDuplicates: false })`.
+In Postgres ist das `INSERT ... ON CONFLICT DO UPDATE`; der UPDATE-Zweig
+verlangt eine eigene **UPDATE-Policy**. `discount_action_brands` hatte nur
+SELECT, INSERT und DELETE. Sobald eine Marken-Zuordnung bereits existierte —
+also bei praktisch jeder Bearbeitung — lehnte Postgres den Schreibvorgang ab:
+
+```
+new row violates row-level security policy (USING expression)
+for table "discount_action_brands"
+```
+
+Der Fehler war **nicht** nutzerspezifisch: er traf jeden. Er fiel nur deshalb
+erst jetzt auf, weil zwischen dem PROJ-12-Deploy und dem 24.08. niemand eine
+bestehende Aktion bearbeitet hat.
+
+**Nebenwirkung:** `updateAction` schreibt zuerst die Aktion selbst und danach
+die Marken-Zuordnungen. Titel, Kanal, Zeitraum und Kommentar wurden also
+gespeichert, die Marken-/Rabatt-Änderung nicht — ein Teilspeichern trotz
+Fehlermeldung. Betroffen: „AT- SA Rabattaktion" (Shopapotheke AT).
+
+**Fix:** Migration `discount_action_brands_update_policy` — dieselbe Regel wie
+die übrigen Policies der Tabelle (PROJ-1-Konvention: `authenticated` voll,
+`anon` Default-Deny):
+
+```sql
+create policy "Authenticated can update discount_action_brands"
+  on public.discount_action_brands
+  for update
+  to authenticated
+  using (auth.uid() is not null)
+  with check (auth.uid() is not null);
+```
+
+**Verifikation:** Upsert auf eine bestehende Zuordnung in der Rolle
+`authenticated` mit echter Nutzer-ID läuft durch (Test in einer Transaktion,
+zurückgerollt). Kontrolle aller Tabellen: `brands`, `marketplaces`,
+`product_groups`, `discount_actions`, `discount_action_brands` haben jetzt alle
+vier Policies; `profiles` bewusst ohne DELETE. `upsert` kommt im Code nur an
+dieser einen Stelle vor. Kein Deploy nötig — die Policy wirkt sofort.
+
+**Lehre für neue Tabellen:** Wer `upsert` benutzt, braucht INSERT **und**
+UPDATE-Policy. Eine Tabelle mit „nur INSERT/DELETE" ist kein sicherer Sparsam-
+Zustand, sondern eine Falle, die erst beim zweiten Speichern derselben Zeile
+zuschnappt.
+
+**Offener Folgepunkt:** Reine Unit-Tests können das nicht abfangen (RLS greift
+nur in der echten Datenbank). Sinnvoll wäre ein E2E-Test „Aktion bearbeiten und
+speichern" gegen die laufende Anwendung — der bestehende Playwright-Aufbau ist
+dafür vorgesehen, lokal aber nicht ausführbar (Umgebung).
