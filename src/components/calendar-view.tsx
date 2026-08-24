@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ActionFormDialog } from "@/components/action-form-dialog";
+import { barFill, DRAFT_SWATCH } from "@/lib/draft-style";
 import {
   CHANNEL_TYPES,
   CHANNEL_TYPE_LABELS_PLURAL,
@@ -99,14 +100,12 @@ export function CalendarView({
   channels,
   actions,
   brands,
-  draftCount = 0,
 }: {
   year: number;
   channels: Option[];
+  /** Both states: drafts are drawn hatched, committed actions solid. */
   actions: DiscountAction[];
   brands: BrandOption[];
-  /** Drafts exist but are never drawn here (PROJ-13) — only mentioned. */
-  draftCount?: number;
 }) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -142,8 +141,21 @@ export function CalendarView({
   const todayPx = todayIso ? datePx(todayIso, year) : null;
   const todayLeft = todayPx !== null ? pct(todayPx) : null;
 
+  // Drafts share the year view since 2026-08-24 — a draft occupies the slot
+  // just as much when you are hunting for a free week. Switching them off
+  // restores the purely binding "what is really booked" view.
+  const [showDrafts, setShowDrafts] = useState(true);
+  const draftCount = useMemo(
+    () => actions.filter((a) => a.status === "draft").length,
+    [actions],
+  );
+  const shownActions = useMemo(
+    () => (showDrafts ? actions : actions.filter((a) => a.status !== "draft")),
+    [actions, showDrafts],
+  );
+
   // One bar per (action × brand). Multi-brand actions become several segments.
-  const segments = useMemo(() => toSegments(actions), [actions]);
+  const segments = useMemo(() => toSegments(shownActions), [shownActions]);
 
   // Rows to render = channels whose type is currently enabled in the filter,
   // grouped by category (Marketplaces → eigene Webshops → Händler) and sorted
@@ -307,6 +319,33 @@ export function CalendarView({
             </Label>
           </div>
         ))}
+
+        {/* Drafts are a different question from the channel categories, hence
+            the divider — same row, separate dimension. */}
+        {draftCount > 0 && (
+          <>
+            <span className="h-4 w-px bg-border" aria-hidden />
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="filter-drafts"
+                checked={showDrafts}
+                onCheckedChange={(v) => setShowDrafts(v === true)}
+              />
+              <Label
+                htmlFor="filter-drafts"
+                className="flex items-center gap-1.5 font-normal"
+              >
+                <span
+                  className="h-3 w-3 shrink-0 rounded-[2px]"
+                  style={DRAFT_SWATCH}
+                  aria-hidden
+                />
+                Entwürfe{" "}
+                <span className="text-muted-foreground">({draftCount})</span>
+              </Label>
+            </div>
+          </>
+        )}
       </div>
 
       {visibleChannels.length === 0 ? (
@@ -315,24 +354,22 @@ export function CalendarView({
           Kanal-Typ.
         </p>
       ) : (
-        actions.length === 0 && (
+        shownActions.length === 0 && (
           <p className="mt-4 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-            Keine Aktionen in {year}. Lege eine Aktion an oder wechsle das Jahr.
-            {/* An empty calendar despite existing drafts looks like data loss. */}
-            {draftCount > 0 && (
+            {/* An empty grid despite existing drafts looks like data loss —
+                say that they are merely hidden. */}
+            {actions.length === 0 ? (
               <>
-                {" "}
+                Keine Aktionen in {year}. Lege eine Aktion an oder wechsle das
+                Jahr.
+              </>
+            ) : (
+              <>
+                Keine übernommenen Aktionen in {year}.{" "}
                 {draftCount === 1
-                  ? "1 Entwurf liegt"
-                  : `${draftCount} Entwürfe liegen`}{" "}
-                in der{" "}
-                <Link
-                  href="/tools/multi-channel-marketing/aktionen"
-                  className="underline underline-offset-2"
-                >
-                  Aktions-Verwaltung
-                </Link>{" "}
-                und erscheinen hier, sobald sie übernommen wurden.
+                  ? "1 Entwurf ist"
+                  : `${draftCount} Entwürfe sind`}{" "}
+                ausgeblendet — aktiviere oben „Entwürfe", um sie zu sehen.
               </>
             )}
           </p>
@@ -406,14 +443,19 @@ export function CalendarView({
                   ))}
 
                   {/* Day-accurate action bars (stacked on overlap) */}
-                  {row.items.map(({ item, leftPx, widthPx, lane }) => (
+                  {row.items.map(({ item, leftPx, widthPx, lane }) => {
+                    const isDraft = item.action.status === "draft";
+                    return (
                     <TooltipProvider key={item.id} delayDuration={150}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button
                             type="button"
                             onClick={() => openEdit(item.action)}
-                            aria-label={`${item.action.title} (${item.brand.name})`}
+                            aria-label={`${item.action.title} (${item.brand.name})${
+                              isDraft ? " — Entwurf" : ""
+                            }`}
+                            data-draft={isDraft || undefined}
                             className="absolute rounded-[2px] ring-1 ring-black/10 transition-[filter] hover:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             style={{
                               left: pct(leftPx),
@@ -421,11 +463,16 @@ export function CalendarView({
                               minWidth: 2,
                               top: lane * slot + (slot - BAR_HEIGHT) / 2,
                               height: BAR_HEIGHT,
-                              backgroundColor: item.brand.color,
+                              ...barFill(item.brand.color, isDraft),
                             }}
                           />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
+                          {isDraft && (
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                              Entwurf
+                            </p>
+                          )}
                           <p className="font-semibold">{item.action.title}</p>
                           <p className="text-xs">
                             {item.action.brands.map((b) => b.name).join(", ")} ·{" "}
@@ -446,7 +493,8 @@ export function CalendarView({
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                  ))}
+                    );
+                  })}
 
                   {/* Truncated past actions: the toggle sits in the next lane,
                       anchored at the action whose brands it hides. */}
@@ -526,11 +574,23 @@ export function CalendarView({
               ))}
             </div>
           ))}
+          {/* Texture key — only where hatched bars can actually be seen. */}
+          {showDrafts && draftCount > 0 && (
+            <div className="flex items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
+              <span
+                className="h-3 w-3 shrink-0 rounded-[2px] border"
+                style={DRAFT_SWATCH}
+                aria-hidden
+              />
+              schraffiert = Entwurf (noch nicht in den Kalender übernommen)
+            </div>
+          )}
         </div>
       )}
 
       <ActionFormDialog
         origin="calendar"
+        draftsVisible={showDrafts}
         open={formOpen}
         onOpenChange={setFormOpen}
         action={editing}

@@ -74,11 +74,15 @@ type ActionFormDialogProps = {
   /** Called after a successful save (e.g. to refresh the calendar). */
   onSuccess?: () => void;
   /**
-   * Where the dialog was opened from. Saving a draft in the calendar produces
-   * nothing visible there (drafts live in the action management page), so that
-   * case gets an explaining toast with a link (PROJ-13).
+   * Where the dialog was opened from — decides how a saved draft is explained
+   * (PROJ-13).
    */
   origin?: "list" | "calendar";
+  /**
+   * Calendar only: whether drafts are currently drawn. A saved draft that is
+   * immediately visible needs no explanation; a hidden one does.
+   */
+  draftsVisible?: boolean;
 };
 
 function today(): string {
@@ -115,6 +119,7 @@ export function ActionFormDialog({
   defaultEndDate,
   onSuccess,
   origin = "list",
+  draftsVisible = false,
 }: ActionFormDialogProps) {
   const isEdit = action !== null;
   const brandGroups = useMemo(() => groupBrands(brands), [brands]);
@@ -206,23 +211,16 @@ export function ActionFormDialog({
     if (isEdit) {
       toast.success("Aktion gespeichert.");
     } else if (status === "draft") {
-      // Saved from the calendar, a draft appears nowhere on screen — say where
-      // it went instead of leaving the user staring at an unchanged calendar.
+      // Drafts are drawn in the calendar since 2026-08-24, so the explanation
+      // is only needed where the save leaves nothing visible: the action list,
+      // or a calendar with drafts switched off.
+      const visibleHere = origin === "calendar" && draftsVisible;
       toast.success("Als Entwurf gespeichert.", {
-        description:
-          origin === "calendar"
-            ? "Der Entwurf liegt unter „Rabatt-Aktionen verwalten“ und erscheint im Kalender, sobald er übernommen wurde."
-            : "Er erscheint im Kalender, sobald er übernommen wurde.",
-        action:
-          origin === "calendar"
-            ? {
-                label: "Zu den Aktionen",
-                onClick: () => {
-                  window.location.href =
-                    "/tools/multi-channel-marketing/aktionen";
-                },
-              }
-            : undefined,
+        description: visibleHere
+          ? "Er erscheint schraffiert im Kalender und wird verbindlich, sobald du ihn übernimmst."
+          : origin === "calendar"
+            ? "Entwürfe sind gerade ausgeblendet — aktiviere „Entwürfe“ im Filter, um ihn zu sehen."
+            : "Er erscheint schraffiert im Kalender und wird verbindlich, sobald du ihn übernimmst.",
       });
     } else {
       toast.success("Aktion angelegt.");

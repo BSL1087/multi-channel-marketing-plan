@@ -2,7 +2,7 @@
 
 ## Status: Deployed
 **Created:** 2026-08-23
-**Last Updated:** 2026-08-23
+**Last Updated:** 2026-08-24
 
 ## Dependencies
 - Requires: PROJ-5 (Rabatt-Aktionen) — Aktionen, Formular-Dialog, Aktionsliste.
@@ -61,10 +61,13 @@ Heute landet jede gespeicherte Aktion sofort im Jahreskalender und gilt damit al
 - [ ] Angenommen es existieren offene Entwürfe, wenn der Nutzer die Aktionsseite öffnet, dann ist ihre Anzahl erkennbar (z.B. am Filter „Entwürfe (3)").
 
 ### Anzeige — Kalender (PROJ-6 & PROJ-8)
-- [ ] Angenommen ein Entwurf liegt im dargestellten Zeitraum, wenn der Nutzer den Jahreskalender öffnet, dann erscheint er dort **nicht** — weder als Balken noch in der Farb-Legende.
-- [ ] Angenommen der Nutzer öffnet den Monats-Zoom (PROJ-8), wenn Entwürfe im Monat liegen, dann erscheinen sie dort ebenfalls nicht.
-- [ ] Angenommen ein Entwurf wird in den Kalender übernommen, wenn der Nutzer danach den Kalender öffnet, dann erscheint die Aktion dort wie jede andere verbindliche Aktion (unverändertes Aussehen, keine Sonderdarstellung).
-- [ ] Angenommen der Nutzer legt im Kalender eine neue Aktion an und wählt „Als Entwurf speichern", wenn gespeichert wird, dann erscheint ein Hinweis (Toast), dass die Aktion als Entwurf in der Aktions-Verwaltung liegt und erst nach dem Übernehmen im Kalender auftaucht — mit Link dorthin.
+> **Revidiert am 2026-08-24:** Entwürfe erscheinen jetzt doch im Kalender — schraffiert in der Markenfarbe. Die ursprüngliche Fassung („erscheinen dort nicht") steht im Decision Log als revidiert; Details in PROJ-6, Abschnitt „Entwürfe in der Jahresansicht".
+- [ ] Angenommen ein Entwurf liegt im dargestellten Zeitraum, wenn der Nutzer den Jahreskalender öffnet, dann erscheint er als **schraffierter Balken in der Markenfarbe** in der Zeile seines Kanals.
+- [ ] Angenommen Entwürfe sind sichtbar, wenn der Nutzer die Checkbox „Entwürfe" in der Filterzeile abwählt, dann verschwinden alle Entwurfs-Balken und der Kalender zeigt ausschließlich verbindlich eingebuchte Aktionen.
+- [ ] Angenommen der Nutzer öffnet den Monats-Zoom (PROJ-8), wenn Entwürfe im Monat liegen, dann erscheinen sie dort ebenfalls schraffiert (ohne eigene Checkbox).
+- [ ] Angenommen ein Entwurf wird in den Kalender übernommen, wenn der Nutzer danach den Kalender öffnet, dann erscheint die Aktion als normal gefüllter Balken (Schraffur verschwindet).
+- [ ] Angenommen der Nutzer klickt einen Entwurfs-Balken, wenn der Bearbeiten-Dialog öffnet, dann steht dort zusätzlich „In Kalender übernehmen" (mit dem bestehenden Bestätigungsdialog) zur Verfügung.
+- [ ] Angenommen der Nutzer legt im Kalender eine neue Aktion an und wählt „Als Entwurf speichern", wenn gespeichert wird, dann erscheint sie unmittelbar als schraffierter Balken; der Hinweis-Toast greift nur noch, wenn Entwürfe gerade ausgeblendet sind.
 
 ### Zugriff & Audit
 - [ ] Angenommen der Nutzer ist nicht eingeloggt, wenn er die Aktionsseite oder den Kalender aufruft, dann wird er wie bisher zur Login-Seite weitergeleitet.
@@ -93,13 +96,13 @@ Heute landet jede gespeicherte Aktion sofort im Jahreskalender und gilt damit al
 - Server: `findActionConflicts` (PROJ-7) liefert je Treffer zusätzlich den Status, damit der Warn-Dialog Entwürfe kennzeichnen kann; die Prüflogik selbst bleibt unverändert.
 - Validierung: Status als Teil des geteilten Zod-Schemas in `action-validation.ts`.
 - Sicherheit: RLS unverändert nach PROJ-1-Konvention (`authenticated` voll, `anon` Default-Deny) — der Status ist ein Workflow-Zustand, keine Berechtigungsgrenze.
-- Daten: Die beiden Kalenderseiten filtern bereits **beim Laden** auf den Zustand „Im Kalender" — Entwürfe erreichen die Ansicht gar nicht erst. Kein neues Bedienelement, keine Sonderdarstellung, keine Änderung an Balken-Layout oder Legende.
+- Daten: Die beiden Kalenderseiten laden seit der Revision vom 2026-08-24 **beide** Zustände; der Zustand steuert nur noch Darstellung (Schraffur) und clientseitigen Filter — nicht mehr die Ladeabfrage (Details in PROJ-6, „Entwürfe in der Jahresansicht“).
 - UI: Der Kalender braucht nur zwei Ergänzungen — den Hinweis-Toast beim Speichern eines Entwurfs und den Zusatz im Leerzustand („X Entwürfe in der Verwaltung", mit Link).
 - UI: shadcn/ui wiederverwenden (Badge, Switch/Toggle, AlertDialog, Select für den Filter) — keine Eigenbauten.
 - Tests: Unit-Tests für Statuswechsel-Regeln (Setzen/Zurücksetzen, `confirmed_*`-Konsistenz) und für die Kalender-Filterung nach Status.
 
 ## Open Questions
-- [x] Sollen Entwürfe im Kalender sichtbar sein? → **Nein**, gar nicht (Nutzer-Entscheidung, 2026-08-23). Damit entfallen Schalter, Schraffur und Legenden-Eintrag ersatzlos.
+- [x] Sollen Entwürfe im Kalender sichtbar sein? → zunächst **Nein** (2026-08-23), **am 2026-08-24 revidiert: Ja** — als schraffierter Balken in Markenfarbe, mit Checkbox zum Ausblenden (Standard: an). Begründung im Decision Log.
 - [x] Braucht es einen dritten Status „Abgelehnt"? → **Nein** (Nutzer-Entscheidung, 2026-08-23). „Zurück auf Entwurf" genügt.
 - [x] Soll die Freigabe je Marke möglich sein? → **Nein** (Nutzer-Entscheidung, 2026-08-23). Der Marketplace-Manager bearbeitet den Entwurf so, wie er ihn tatsächlich im Marketplace hinterlegt hat, und übernimmt ihn dann — der Entwurf bildet damit immer die Wirklichkeit ab, ohne zweite Zustandsebene.
 - [ ] Soll beim Anlegen der Standard-Button „Als Entwurf speichern" oder „In Kalender übernehmen" sein (aktuell vorgesehen: Übernehmen als primärer Button, Entwurf als sekundärer)?
@@ -111,8 +114,8 @@ Heute landet jede gespeicherte Aktion sofort im Jahreskalender und gilt damit al
 |----------|-----------|------|
 | Zwei Status: Entwurf / Im Kalender | Bildet den realen Zwei-Schritt-Ablauf ab (planen → im Marketplace anlegen → verbindlich), ohne einen Workflow-Baukasten zu bauen | 2026-08-23 |
 | **Kein** Rollensystem | Das Projekt hat heute keins (PROJ-2 = gemeinsamer Team-Zugang). Für ein kleines Team genügt „wer hat übernommen" via `confirmed_by`; Rollen wären Overhead und eine eigene Baustelle | 2026-08-23 |
-| **Entwürfe erscheinen gar nicht im Kalender** (Entscheidung des Nutzers, 2026-08-23) | Der Kalender soll die Wirklichkeit zeigen, nicht die Absicht. Der ursprüngliche Gegeneinwand — unsichtbare Entwürfe würden die Kannibalisierungs-Warnung aushebeln — **trifft nicht zu**: PROJ-7 prüft serverseitig gegen die Datenbank, nicht gegen die gezeichnete Ansicht. Entwürfe werden also weiterhin erkannt und gemeldet. Es bleibt nur der schwächere Fall, dass eine Lücke im Kalender optisch frei wirkt, obwohl sie verplant ist — dagegen greift die Warnung beim Speichern | 2026-08-23 |
-| Damit entfallen: Schraffur, Ein-/Ausblende-Schalter, Legenden-Eintrag | Kleineres Feature, weniger Bedienelemente, keine zweite Farbbedeutung im Kalender | 2026-08-23 |
+| **Entwürfe erscheinen gar nicht im Kalender** (Entscheidung des Nutzers, 2026-08-23) | Der Kalender soll die Wirklichkeit zeigen, nicht die Absicht. Der ursprüngliche Gegeneinwand — unsichtbare Entwürfe würden die Kannibalisierungs-Warnung aushebeln — **trifft nicht zu**: PROJ-7 prüft serverseitig gegen die Datenbank, nicht gegen die gezeichnete Ansicht. Entwürfe werden also weiterhin erkannt und gemeldet. Es bleibt nur der schwächere Fall, dass eine Lücke im Kalender optisch frei wirkt, obwohl sie verplant ist — dagegen greift die Warnung beim Speichern — **am 2026-08-24 revidiert, siehe unten** | 2026-08-23 |
+| Damit entfallen: Schraffur, Ein-/Ausblende-Schalter, Legenden-Eintrag | Kleineres Feature, weniger Bedienelemente, keine zweite Farbbedeutung im Kalender — **am 2026-08-24 revidiert: Schraffur und Schalter kommen doch** | 2026-08-23 |
 | Hinweis-Toast beim Speichern eines Entwurfs aus dem Kalender heraus | Ohne ihn wirkt „gespeichert, aber nichts erscheint" wie ein Fehler; der Toast erklärt, wo die Aktion liegt, und verlinkt dorthin | 2026-08-23 |
 | Konfliktprüfung berücksichtigt Entwürfe, kennzeichnet sie aber | Frühzeitige Warnung, ohne dass ein Entwurf wie eine gebuchte Aktion wirkt | 2026-08-23 |
 | Status gilt je Aktion, nicht je Marke (bestätigt vom Nutzer, 2026-08-23) | Der Entwurf ist bearbeitbar: Teilerfolge bildet der Marketplace-Manager ab, indem er den Entwurf auf den tatsächlich eingebuchten Stand ändert und dann übernimmt. Eine Zustandsebene je Marke würde dieselbe Information doppelt führen | 2026-08-23 |
@@ -121,6 +124,11 @@ Heute landet jede gespeicherte Aktion sofort im Jahreskalender und gilt damit al
 | „Zurück auf Entwurf" ist möglich (mit Bestätigung) | Marketplaces lehnen Aktionen ab oder Termine verschieben sich — der Weg muss in beide Richtungen gehen | 2026-08-23 |
 | Bestandsaktionen werden „Im Kalender" | Sie galten bisher als verbindlich; alles andere würde den Kalender rückwirkend entwerten | 2026-08-23 |
 | Übernehmen bleibt trotz Konflikten möglich | Konsistent mit der „warnen statt blockieren"-Philosophie aus PROJ-7 | 2026-08-23 |
+| **Revision 2026-08-24: Entwürfe erscheinen doch im Kalender** — schraffiert in Markenfarbe | Die Jahresansicht dient primär der Planung („wo ist noch Platz, wo häuft sich was?"), nicht der Statusabfrage. Für diese Frage belegt ein Entwurf den Slot faktisch. Der im Spec bereits vermerkte Preis der alten Entscheidung — „eine Lücke wirkt optisch frei, obwohl sie verplant ist" — wiegt beim Jahresplanen schwerer als die begriffliche Reinheit der Ist-Ansicht; die PROJ-7-Warnung greift erst beim Speichern, also nach der Entscheidung | 2026-08-24 |
+| Markenfarbe bleibt, Schraffur trägt den Status | Graue Entwurfs-Balken hätten die Markenerkennung zerstört — genau die Information, für die der Kalender gebaut ist. Farbe = welche Marke, Textur = wie verbindlich: zwei unabhängige Signale ohne Konflikt, Legende bleibt gültig | 2026-08-24 |
+| Checkbox „Entwürfe" in der Filterzeile, Standard **an** | Die reine Ist-Ansicht bleibt einen Klick entfernt. Standard „an", weil die Planungssicht der Regelfall ist — ein Schalter, den man erst einschalten muss, verfehlt den Zweck der Änderung | 2026-08-24 |
+| Monats-Zoom zeigt Entwürfe ebenfalls, aber ohne eigene Checkbox | Gleiche Darstellung in beiden Ansichten, damit beim Wechsel kein Balken unerklärt verschwindet. PROJ-8 bleibt bewusst ohne Filterzeile | 2026-08-24 |
+| Klick auf einen Entwurfs-Balken bietet „In Kalender übernehmen" | Wer den Entwurf beim Planen sieht und für gut befindet, soll ihn dort freigeben können, statt in die Aktions-Verwaltung zu wechseln. Der Statuswechsel bleibt eine eigene, bestätigungspflichtige Handlung | 2026-08-24 |
 
 ### Technical Decisions
 | Decision | Rationale | Date |
@@ -132,11 +140,14 @@ Heute landet jede gespeicherte Aktion sofort im Jahreskalender und gilt damit al
 | Statuswechsel überschreibt keine inhaltlichen Felder | Zwei Nutzer, die gleichzeitig bearbeiten und freigeben, treten sich nicht gegenseitig auf die Füße | 2026-08-23 |
 | Index auf `status` | Liste und Kalender filtern künftig danach | 2026-08-23 |
 | `findActionConflicts` liefert den Status **mit**, Prüflogik unverändert | Der Warn-Dialog muss Entwürfe kennzeichnen können; die Erkennung selbst (Marke + Zeitraum) ändert sich nicht | 2026-08-23 |
-| Kalender filtert auf `status = 'confirmed'` **in der Ladeabfrage**, nicht beim Zeichnen | Entwürfe erreichen die Ansicht gar nicht; dadurch bleiben Balken-Layout, Legende und Filterzeile vollständig unverändert und es entsteht kein Sonderfall in der Darstellungslogik | 2026-08-23 |
-| Kein neues Bedienelement im Kalender | Die Kalender-Filterzeile bleibt den Kanal-Kategorien vorbehalten; der Zustand ist keine Anzeigevorliebe, sondern eine inhaltliche Zusage | 2026-08-23 |
+| Kalender filtert auf `status = 'confirmed'` **in der Ladeabfrage**, nicht beim Zeichnen | Entwürfe erreichen die Ansicht gar nicht; dadurch bleiben Balken-Layout, Legende und Filterzeile vollständig unverändert und es entsteht kein Sonderfall in der Darstellungslogik — **am 2026-08-24 revidiert** | 2026-08-23 |
+| Kein neues Bedienelement im Kalender | Die Kalender-Filterzeile bleibt den Kanal-Kategorien vorbehalten; der Zustand ist keine Anzeigevorliebe, sondern eine inhaltliche Zusage — **am 2026-08-24 revidiert: eine Checkbox „Entwürfe“ kommt hinzu** | 2026-08-23 |
 | Rein additive Migration, keine zweite Phase | Es wird nichts entfernt; der aktuell deployte Code ignoriert die neuen Spalten. Anders als bei PROJ-12 ist kein Übergangs-Trigger nötig | 2026-08-23 |
 | Backend vor Frontend | Ohne den Zustand in der Datenbank kann die Oberfläche ihn weder anzeigen noch setzen | 2026-08-23 |
 | Keine neuen Pakete, eine neue Komponente (Statuswechsel-Dialog) | Alle Bausteine vorhanden; Konvention „shadcn/ui first" | 2026-08-23 |
+| Kalenderseiten laden **beide** Zustände; Unterscheidung und Filterung im Client (Revision 2026-08-24) | Der Zustand ist jetzt eine Darstellungsdimension. Es braucht keine zweite Abfrage — die bestehende lässt den Status-Filter weg und liefert das Feld mit; die separate Entwurfs-Zählung entfällt | 2026-08-24 |
+| Schraffur als CSS-Overlay (repeating-linear-gradient) über der Markenfarbe, ~65 % Deckkraft | Kein zweiter Balkentyp im Layout: Geometrie, Stapeln und Spurenlogik bleiben unberührt, nur die Balken-Klasse unterscheidet sich | 2026-08-24 |
+| Entwürfe zählen in Stapel- und Kürzungslogik wie normale Aktionen | Sonst entstünde ein zweiter Sonderfall in der Layout-Logik. Folge: Zeilen können höher werden — akzeptiert; die „mehr/weniger"-Kürzung vergangener, markenreicher Aktionen greift unverändert | 2026-08-24 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
@@ -319,6 +330,8 @@ Wie bei PROJ-12: **Backend zuerst** (Zustand + Freigabe-Angaben + Bestandsdaten)
 - [x] Entwürfe erscheinen nicht im Monats-Zoom — dieselbe Abfrage
 - [x] Übernommene Aktion sieht aus wie jede andere — an der Darstellung wurde nichts geändert
 - [x] Hinweis beim Speichern eines Entwurfs aus dem Kalender — Code-Review (`origin="calendar"` in beiden Ansichten gesetzt)
+
+> **Hinweis 2026-08-24:** Diese vier Punkte beschreiben den Stand vom 2026-08-23. Die zugrundeliegende Produktentscheidung wurde am 2026-08-24 revidiert (Entwürfe erscheinen schraffiert im Kalender) — die Kalender-Punkte sind nach der Umsetzung neu zu prüfen.
 
 **Zugriff & Audit**
 - [x] Nicht eingeloggt → /login: `/aktionen`, `/tools/multi-channel-marketing` und `?month=3` liefern **HTTP 307**

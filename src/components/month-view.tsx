@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ActionFormDialog } from "@/components/action-form-dialog";
+import { barFill, DRAFT_SWATCH } from "@/lib/draft-style";
 import {
   CHANNEL_TYPE_STYLES,
   groupChannelsByType,
@@ -91,6 +92,10 @@ export function MonthView({
   /** 0-based month index (Jan = 0). */
   month: number;
   channels: Option[];
+  /**
+   * Both states. Like the year view, the month view draws drafts hatched
+   * (2026-08-24) — but without a switch of its own, since it has no filter row.
+   */
   actions: DiscountAction[];
   brands: BrandOption[];
 }) {
@@ -161,6 +166,11 @@ export function MonthView({
       })),
     }));
   }, [segments, channelGroups, year, month, todayIso, expandedChannels]);
+
+  const hasDrafts = useMemo(
+    () => actions.some((a) => a.status === "draft"),
+    [actions],
+  );
 
   // Colour legend: brands present this month, grouped by product group.
   const legend = useMemo(() => {
@@ -342,6 +352,7 @@ export function MonthView({
                     {layout.items.map(
                       ({ item, leftPx, widthPx, lane, clippedStart, clippedEnd }) => {
                         const light = isLightColor(item.brand.color);
+                        const isDraft = item.action.status === "draft";
                         const showDiscount = widthPx >= 4 * DAY_WIDTH;
                         return (
                           <TooltipProvider key={item.id} delayDuration={150}>
@@ -350,7 +361,10 @@ export function MonthView({
                                 <button
                                   type="button"
                                   onClick={() => openEdit(item.action)}
-                                  aria-label={`${item.action.title} (${item.brand.name})`}
+                                  aria-label={`${item.action.title} (${item.brand.name})${
+                                    isDraft ? " — Entwurf" : ""
+                                  }`}
+                                  data-draft={isDraft || undefined}
                                   className={`absolute flex items-center gap-1 overflow-hidden px-1.5 text-left ring-1 ring-black/10 transition-[filter] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                                     clippedStart ? "rounded-l-none" : "rounded-l-[3px]"
                                   } ${
@@ -361,7 +375,7 @@ export function MonthView({
                                     width: pct(widthPx),
                                     top: ROW_PAD + lane * LANE_SLOT,
                                     height: BAR_HEIGHT,
-                                    backgroundColor: item.brand.color,
+                                    ...barFill(item.brand.color, isDraft),
                                     color: light ? "#111827" : "#ffffff",
                                   }}
                                 >
@@ -383,6 +397,11 @@ export function MonthView({
                                 </button>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
+                                {isDraft && (
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                                    Entwurf
+                                  </p>
+                                )}
                                 <p className="font-semibold">{item.action.title}</p>
                                 <p className="text-xs">
                                   {item.action.brands.map((b) => b.name).join(", ")}{" "}
@@ -470,11 +489,23 @@ export function MonthView({
               ))}
             </div>
           ))}
+          {/* Texture key — brands say which, hatching says how binding. */}
+          {hasDrafts && (
+            <div className="flex items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
+              <span
+                className="h-3 w-3 shrink-0 rounded-[2px] border"
+                style={DRAFT_SWATCH}
+                aria-hidden
+              />
+              schraffiert = Entwurf (noch nicht in den Kalender übernommen)
+            </div>
+          )}
         </div>
       )}
 
       <ActionFormDialog
         origin="calendar"
+        draftsVisible
         open={formOpen}
         onOpenChange={setFormOpen}
         action={editing}

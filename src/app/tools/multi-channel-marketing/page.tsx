@@ -9,7 +9,7 @@ import { CalendarView } from "@/components/calendar-view";
 import { MonthView } from "@/components/month-view";
 import { daysInMonth, resolveMonth } from "@/lib/month-layout";
 import type { ChannelType } from "@/lib/channel-validation";
-import type { DiscountAction } from "./aktionen/actions";
+import type { ActionStatus, DiscountAction } from "./aktionen/actions";
 
 type ChannelOption = { id: string; name: string; type: ChannelType };
 
@@ -22,6 +22,7 @@ type ActionRow = {
   start_date: string;
   end_date: string;
   comment: string | null;
+  status: ActionStatus;
   marketplaces: { name: string } | { name: string }[] | null;
   discount_action_brands:
     | { discount_value: string; brands: BrandJoin | BrandJoin[] | null }[]
@@ -83,16 +84,16 @@ export default async function CalendarPage({
     { data: actionRows, error: actionsError },
     { data: channels },
     { data: brandRows },
-    { count: draftCount },
   ] = await Promise.all([
       supabase
         .from("discount_actions")
         .select(
-          "id, title, marketplace_id, start_date, end_date, comment, marketplaces(name), discount_action_brands(discount_value, brands(id, name, color))",
+          "id, title, marketplace_id, start_date, end_date, comment, status, marketplaces(name), discount_action_brands(discount_value, brands(id, name, color))",
         )
-        // PROJ-13: the calendar is the binding year view — drafts live in the
-        // action management page only and never reach this query.
-        .eq("status", "confirmed")
+        // Both states are loaded: since 2026-08-24 the calendar draws drafts
+        // too (hatched), because a draft occupies the slot just as much when
+        // you are looking for a free week. The status steers rendering and the
+        // client-side filter — it no longer narrows this query.
         .lte("start_date", rangeEnd)
         .gte("end_date", rangeStart)
         .returns<ActionRow[]>(),
@@ -106,14 +107,6 @@ export default async function CalendarPage({
         .select("id, name, color, product_groups(name)")
         .order("name")
         .returns<BrandRow[]>(),
-      // Drafts never appear in the calendar, but an empty year view should say
-      // that some exist rather than look like everything vanished (PROJ-13).
-      supabase
-        .from("discount_actions")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "draft")
-        .lte("start_date", rangeEnd)
-        .gte("end_date", rangeStart),
     ]);
 
   const actions: DiscountAction[] = (actionRows ?? []).map((a) => {
@@ -135,9 +128,9 @@ export default async function CalendarPage({
       comment: a.comment,
       marketplace_name: mp?.name ?? "—",
       brands: actionBrands,
-      // Everything reaching the calendar is confirmed by definition; the
-      // approval details are only shown in the action management page.
-      status: "confirmed" as const,
+      // The status drives the hatching in both calendar views; who committed
+      // it and when stays a detail of the action management page.
+      status: a.status,
       confirmed_at: null,
       confirmed_by_email: null,
     };
@@ -172,7 +165,8 @@ export default async function CalendarPage({
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Rabatt-Aktionen je Kanal. Klicke einen Monatskopf für die
-          Tagesansicht, einen Balken zum Bearbeiten.
+          Tagesansicht, einen Balken zum Bearbeiten. Schraffierte Balken sind
+          Entwürfe.
         </p>
 
         {/* Ein leerer Kalender wegen eines Abfragefehlers sieht aus wie „nichts
@@ -197,7 +191,6 @@ export default async function CalendarPage({
             channels={channels ?? []}
             actions={actions}
             brands={brands}
-            draftCount={draftCount ?? 0}
           />
         )}
       </main>

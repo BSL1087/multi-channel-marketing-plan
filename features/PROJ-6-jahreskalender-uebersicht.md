@@ -2,7 +2,7 @@
 
 ## Status: Planned
 **Created:** 2026-06-26
-**Last Updated:** 2026-06-26
+**Last Updated:** 2026-08-24
 
 ## Dependencies
 - Requires: PROJ-1 (Supabase-Infrastruktur) — DB/RLS.
@@ -82,6 +82,9 @@
 | Alle Kanäle als Zeilen (auch leere) | Vollständiger Überblick; freie Slots sichtbar | 2026-06-26 |
 | Kein Filter im MVP | Erst Darstellung richtig machen; Filter als Folge-Feature | 2026-06-26 |
 | Jahresnavigation, Start im laufenden Jahr; jahresübergreifend anteilig | Kalender ist jahresbasiert | 2026-06-26 |
+| Entwürfe erscheinen im Kalender — schraffiert in Markenfarbe, Checkbox zum Ausblenden (Standard an) | Die Jahresansicht dient der Planung; ein unsichtbarer Entwurf belegt den Slot trotzdem. Revidiert die PROJ-13-Entscheidung vom 2026-08-23 | 2026-08-24 |
+| Schraffur statt Graustufe | Grau hätte die Markenerkennung zerstört — Farbe sagt „welche Marke", Textur sagt „wie verbindlich" | 2026-08-24 |
+| Klick auf einen Entwurf bietet „In Kalender übernehmen" | Freigabe dort, wo die Planungsentscheidung fällt; der Statuswechsel bleibt bestätigungspflichtig | 2026-08-24 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
@@ -311,6 +314,91 @@ Helfer stehen in PROJ-3 („Erweiterung: Kanal-Kategorien").
   weiterhin **keinen** eigenen Filter — das bleibt offen.
 - Auch das Kanal-Dropdown im Aktions-Dialog und die Kanal-Verwaltung sind nach
   Kategorie gruppiert, damit die Reihenfolge überall gleich ist.
+
+## Entwürfe in der Jahresansicht (Änderung 2026-08-24)
+
+**Auslöser:** Mit PROJ-13 wurde festgelegt, dass Entwürfe im Kalender gar nicht erscheinen. In der Praxis fehlt damit beim Jahresplanen genau die Information, die die Entscheidung „wann mache ich wo welche Aktion?" trägt: Ein Entwurf belegt den Slot faktisch, ist aber unsichtbar. Die Kannibalisierungs-Warnung (PROJ-7) fängt das ab — allerdings erst beim Speichern, also nachdem die Entscheidung gefallen ist.
+
+**Entscheidung:** Entwürfe werden in Jahres- und Monatsansicht mit dargestellt, aber klar als Entwurf erkennbar.
+
+### Darstellung
+- Entwurfs-Balken behalten die **Markenfarbe** und bekommen eine **diagonale Schraffur** (helle Streifen) bei leicht reduzierter Deckkraft (~65 %). Farbe beantwortet „welche Marke", Textur beantwortet „wie verbindlich" — zwei unabhängige Signale.
+- **Kein Grau:** es hätte die Markenerkennung zerstört, also genau die Information, für die diese Ansicht gebaut ist.
+- Geometrie, Balkenhöhe (8 px), Stapeln und Spurenlogik bleiben unverändert; Entwürfe sind normale Balken mit anderer Füllung.
+- Die **Legende** bleibt markenbasiert und bekommt einen zusätzlichen Schlüssel „schraffiert = Entwurf" (kleiner Musterbalken), sichtbar nur, wenn im Zeitraum Entwürfe vorkommen.
+- Der **Tooltip** eines Entwurfs trägt das Kennzeichen „Entwurf" an erster Stelle.
+
+### Bedienung
+- Die bestehende Filterzeile (Kanal-Kategorien) bekommt eine zusätzliche Checkbox **„Entwürfe"** mit Anzahl, standardmäßig **an**. Abwählen ergibt wieder die reine Ist-Ansicht.
+- Die **Monats-Detailansicht (PROJ-8)** zeigt Entwürfe genauso schraffiert, hat aber **keine** eigene Checkbox — sie bleibt ohne Filterzeile.
+- **Klick auf einen Entwurfs-Balken** öffnet den Bearbeiten-Dialog; bei Entwürfen enthält dieser zusätzlich **„In Kalender übernehmen"** mit dem bestehenden Bestätigungsdialog aus PROJ-13. Der Statuswechsel bleibt damit eine bewusste, eigene Handlung.
+
+### Acceptance Criteria (Ergänzung)
+- [ ] Angenommen ein Entwurf liegt im angezeigten Jahr, wenn der Kalender lädt, dann erscheint er als schraffierter Balken in der Markenfarbe in der Zeile seines Kanals.
+- [ ] Angenommen Entwürfe und eingebuchte Aktionen liegen nebeneinander, wenn der Nutzer die Ansicht überfliegt, dann sind beide ohne Hover unterscheidbar (volle Füllung vs. Schraffur).
+- [ ] Angenommen die Checkbox „Entwürfe" ist abgewählt, wenn der Kalender neu zeichnet, dann ist kein Entwurfs-Balken sichtbar und die Legende enthält keine Marke, die nur durch Entwürfe vertreten wäre.
+- [ ] Angenommen im Zeitraum ist mindestens ein Entwurf sichtbar, wenn die Legende gerendert wird, dann enthält sie den Schlüssel „schraffiert = Entwurf".
+- [ ] Angenommen der Nutzer fährt über einen Entwurfs-Balken, wenn der Tooltip erscheint, dann ist er als „Entwurf" gekennzeichnet.
+- [ ] Angenommen der Nutzer klickt einen Entwurfs-Balken, wenn der Dialog öffnet, dann steht „In Kalender übernehmen" zur Verfügung; nach der Bestätigung ist der Balken ohne Schraffur dargestellt.
+- [ ] Angenommen der Nutzer öffnet die Monats-Detailansicht, wenn Entwürfe im Monat liegen, dann erscheinen sie dort schraffiert (ohne eigene Checkbox).
+
+### Nebenwirkungen (bewusst akzeptiert)
+- **Zeilen werden höher:** Entwürfe belegen Spuren wie jede andere Aktion. Die Kürzung vergangener, markenreicher Aktionen („mehr"/„weniger") greift unverändert und behandelt Entwürfe nicht gesondert.
+- **Der Hinweis-Toast aus PROJ-13** („Entwurf liegt in der Verwaltung") ist nur noch sinnvoll, solange die Checkbox „Entwürfe" aus ist — sonst sieht der Nutzer das Ergebnis unmittelbar.
+- **Der Leerzustands-Zusatz** („X Entwürfe liegen in der Verwaltung") greift ebenfalls nur noch bei ausgeblendeten Entwürfen.
+
+### Technische Umsetzung (Skizze)
+- Beide Kalenderansichten laden Aktionen **ohne** Status-Einschränkung und reichen `status` an die Ansicht durch — statt der heutigen `.eq("status", "confirmed")`-Filterung in `src/app/tools/multi-channel-marketing/page.tsx`. Die separate Entwurfs-Zählung (`draftCount`) entfällt bzw. ergibt sich aus den geladenen Daten.
+- `calendar-view.tsx` / `month-view.tsx`: Balken-Klasse abhängig vom Status; Schraffur als `repeating-linear-gradient`-Overlay über der Markenfarbe. Der Entwurfs-Filter läuft clientseitig neben den Kanal-Kategorien.
+- `calendar-layout.ts` bleibt unverändert — der Status beeinflusst die Geometrie nicht.
+- Tests: Filterlogik (Entwürfe ein/aus) und Legenden-Ableitung; die bestehenden Layout-Tests bleiben gültig.
+
+**Status der Änderung:** umgesetzt am 2026-08-24 (Implementation Notes unten).
+
+### Implementation Notes (Frontend, 2026-08-24)
+
+- **`src/lib/draft-style.ts` (neu):** `barFill(color, isDraft)` liefert die
+  Balken-Füllung — solide bei übernommenen Aktionen, Markenfarbe plus
+  `repeating-linear-gradient`-Schraffur bei Entwürfen. Die Streifenfarbe richtet
+  sich über `isLightColor` nach der Helligkeit der Markenfarbe (dunkle Streifen
+  auf hellen Farben, helle auf dunklen), sonst wäre die Schraffur auf einem
+  hellen Gelb unsichtbar. `DRAFT_SWATCH` ist das neutrale Muster-Kästchen für
+  Filter und Legende. Unit-Tests: `src/lib/draft-style.test.ts`.
+- **Seite (`page.tsx`):** `.eq("status", "confirmed")` entfernt, `status` ins
+  Select aufgenommen und durchgereicht; die separate `draftCount`-Abfrage
+  entfällt (die Zahl ergibt sich aus den geladenen Aktionen). Untertitel ergänzt:
+  „Schraffierte Balken sind Entwürfe."
+- **`calendar-view.tsx`:** Zustand `showDrafts` (Standard an) filtert die
+  Aktionen **vor** der Segment-Bildung, dadurch bleiben Layout, Stapeln und
+  Legende unverändert. Checkbox „Entwürfe (n)" erscheint nur, wenn es im Jahr
+  Entwürfe gibt — abgetrennt durch einen kleinen Strich von den Kategorie-Filtern.
+  Balken tragen `data-draft` und die Schraffur, der Tooltip ein „Entwurf"-Label
+  über dem Titel, die Legende den Schlüssel „schraffiert = Entwurf".
+- **Leerzustand:** unterscheidet jetzt „gar keine Aktionen im Jahr" von „nur
+  Entwürfe, und die sind ausgeblendet" (letzteres mit Anzahl und Hinweis auf die
+  Checkbox) — ein leeres Raster darf nie wie Datenverlust aussehen.
+- **`month-view.tsx`:** gleiche Schraffur, gleiches Tooltip-Label, gleicher
+  Legenden-Schlüssel; **kein** Filter (die Ansicht hat keine Filterzeile).
+- **`action-form-dialog.tsx`:** neuer optionaler Prop `draftsVisible`. Der
+  Hinweis-Toast beim Speichern eines Entwurfs erklärt jetzt die Schraffur; nur
+  wenn Entwürfe gerade ausgeblendet sind, weist er auf die Checkbox hin. Der
+  bisherige Link „Zu den Aktionen" ist entfallen — der Entwurf ist ja sichtbar.
+  Der Button „In Kalender übernehmen" im Bearbeiten-Dialog existierte bereits
+  (PROJ-13) und greift nun auch vom Kalender aus.
+- **`calendar-layout.ts` unverändert** — der Zustand beeinflusst die Geometrie
+  nicht; Entwürfe belegen Spuren wie jede andere Aktion.
+
+**Tests:** `src/components/calendar-view.test.tsx` (Schraffur vs. solide,
+Accessible Name mit „Entwurf", Filter mit Anzahl, Ausblenden entfernt Balken und
+Legenden-Schlüssel, Leerzustand bei ausgeblendeten Entwürfen, keine
+Filter-Steuerung ohne Entwürfe) und `src/components/month-view.test.tsx`
+(Schraffur + Legenden-Schlüssel).
+
+**Verifikation:** `tsc --noEmit` ✓, `npm test` (110 Tests, davon 11 neu) ✓,
+`next build` ✓. Datenstand laut Supabase: 2026 enthält 11 übernommene Aktionen
+und **einen** Entwurf („Amazon Prime Days Oktober", Amazon, 01.–31.10., 5 Marken)
+— dieser erscheint jetzt schraffiert und lässt die Amazon-Zeile im Oktober auf
+5 Spuren wachsen (Entwürfe in der Zukunft werden bewusst nie gekürzt).
 
 ## Deployment
 _To be added by /deploy_

@@ -2,7 +2,7 @@
 
 ## Status: Approved
 **Created:** 2026-06-29
-**Last Updated:** 2026-06-29
+**Last Updated:** 2026-08-24
 
 ## Dependencies
 - Requires: PROJ-6 (Jahreskalender-Übersicht) — liefert die Kalender-Darstellung, das Layout (`calendar-layout.ts`), die Kanal-Zeilen und den Einstiegspunkt (Klick auf Monatskopf).
@@ -222,6 +222,12 @@ Umgesetzt gemäß Tech Design — reine Frontend-Erweiterung, kein neues Schema,
 - **Verifikation:** `tsc` clean, `vitest` 58/58 grün, manueller UI-Smoke (volle Breite, Navigation, Achse, Überlauf, Bearbeiten/Löschen/Anlegen, Zeilenhöhe) durch Nutzer bestätigt.
 - **Production Ready:** **YES** — keine offenen Critical/High-Bugs.
 - **Recommendation:** **Deploy** → `/deploy`. Kein Backend nötig.
+
+## Entwürfe in der Monatsansicht (Änderung 2026-08-24)
+
+Die Monatsansicht zeigt Entwürfe künftig genauso wie die Jahresansicht: schraffierter Balken in der Markenfarbe, Tooltip mit Kennzeichen „Entwurf", Klick bietet „In Kalender übernehmen". **Keine** eigene Checkbox zum Ausblenden — die Monatsansicht bleibt ohne Filterzeile. Spezifikation und Begründung: PROJ-6, Abschnitt „Entwürfe in der Jahresansicht". Revidiert die PROJ-13-Entscheidung vom 2026-08-23.
+
+**Status der Änderung:** umgesetzt am 2026-08-24 (`month-view.tsx`: Schraffur, Tooltip-Kennzeichen, Legenden-Schlüssel; kein eigener Filter). Details in PROJ-6.
 
 ## Deployment
 **Deployed:** 2026-06-29
